@@ -791,7 +791,7 @@ The real benefit here is that the self-reported labels cannot be considered the 
 likely many samples are truly epigenetic / genetic mixtures between ethnicities.
 
 ```{r}
-## Threshold at 0.6
+## Threshold at 0.75
 pDat <- pDat %>% 
   mutate(Predicted_ethnicity = case_when(
       Highest_Prob > 0.75 ~ as.character(glm_pred),
