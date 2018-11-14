@@ -1,0 +1,492 @@
+---
+title: "04_validation_cohort"
+author: "Victor Yuan"
+date: "November 7, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Libraries
+
+```{r}
+library(minfi)
+library(wateRmelon)
+library(tidyr)
+library(MatrixEQTL)
+library(ggplot2)
+library(methylkit)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(corrplot)
+library(vicbits) # library(devtools);install_github('wvictor14/vicbits')
+library(stringr)
+library(gridExtra)
+library(grid)
+library(sva)
+library(limma)
+library(snpReady) # don't think I used this either
+library(egg) # don't think I use this, was for plotting multiple things
+library(caret) 
+library(LEA) # for running STRUCTURE
+library(gtable) # plotting multiple things
+library(doParallel) # fitting predictor
+library(SNPRelate) # snp pruning
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+library(cowplot)
+library(qqman)
+source('Z:/Victor/Code/makeSampleSheet.R')
+```
+
+# 1.0 Methylation Data
+
+## 1.1 read data in
+
+I read in all samples ran on the 2.5Omni array part of Giulia's project, then filter down to those 
+with 450k data.
+
+```{r}
+# Load all CNV data
+load('../../../data/Robinson/Omni2.5_Array/01_GenoRep2c.RData')
+cnvPP <- read.csv('../../../data/Robinson/Omni2.5_Array/CNV PROJECT PLANNING VYedit.csv') %>% as_tibble()
+Omni25Cases <- read.csv('../../../data/Robinson/Omni2.5_Array/Omni25Cases.csv') %>% as_tibble()
+snpanno <- read.delim('Z:/ROBLAB6 Infinium450k John/ILLUMINA SNP ARRAYS/ILLUMINA GS files/HumanOmni2-5-8-v1-3-a1/InfiniumOmni2-5-8v1-3_A1.annotated.txt') %>% as_tibble()
+rs_to_kgp <- read.delim('../../../data/Illumina manifest//InfiniumOmni2-5-8v1-3_A1_b144_rsids.txt') %>%
+  as_tibble()
+
+# match snp kgp ids to updated rs ids
+snpanno <- snpanno %>% inner_join(rs_to_kgp) %>% select(Name, RsID, Chr:Mutation.s.) %>%
+  inner_join(tibble(Name = rownames(geno.rep2c)))
+snpanno <- snpanno[match(rownames(geno.rep2c), as.character(snpanno$Name)),]
+all(snpanno$Name == rownames(geno.rep2c)) # T
+
+
+#filter out only those that are in Omni25Cases
+Omni25Cases <- Omni25Cases %>% mutate(Sample_ID2 = gsub('-', '', Sample_ID)) %>% #no dash!
+  filter(Sample_ID2 %in%colnames(geno.rep2c)) 
+snps <- geno.rep2c[,Omni25Cases$Sample_ID2]
+dim(snps)
+
+#filter only those with 450k data
+Samp450k <- cnvPP %>% filter(X450k.array == 'YES') %>% pull(Study.ID)
+all(Samp450k %in% Omni25Cases$Case_ID)
+
+samplesheet <- makeSampleSheet(Samp450k) # will also load non-villi samples, so need to filter these out
+
+# what samples are there no villi for?
+villi450k <- samplesheet %>% filter(Tissue == 'villi') %>% pull(Sample_Name)
+Samp450k[!Samp450k %in% villi450k] #samples that are marked as in 450k, but are not villi
+samplesheet %>% filter(Sample_Name %in% c('PM151',  'PM234',  'PM83',   'PM110' ))
+
+# read em all in
+rgset <- read.metharray.exp(targets = samplesheet, extended =T, verbose = T)
+```
+
+54 unique samples ran on omni (1 site per patient)
+
+```{r}
+pDat <- as.data.frame(pData(rgset)) %>% as_tibble() 
+table(is.na(pDat$Tissue)) # 2 falses
+pDat$Tissue[is.na(pDat$Tissue)] <- 'villi' # for the two pl samples
+pDat$rownames <- colnames(rgset)
+
+pDat <- pDat %>% filter(Tissue == 'villi') %>% select(-filenames, -Basename)
+rgset <- rgset[,pDat$rownames]
+```
+
+## Take out replicates
+
+I keep only 1 sample per replicate group, the one that is highest quality. Quality
+i define as number of poor quality probes a
+
+```{r}
+# add replicate symbol for dups
+pDat <- pDat %>% group_by(Sample_Name) %>% 
+  mutate(Replicate_ID = paste0(Sample_Name, '_R', row_number()),
+         Replicate_Num = gsub('^.*_', '', Replicate_ID))
+
+## get data
+colnames(rgset) <- pDat$Replicate_ID
+betas <- getBeta(rgset)
+detp <- detectionP(rgset)
+bc <- beadcount(rgset)
+
+#calculate poor quality probe numbers
+pDat <- pDat %>% ungroup %>% 
+  mutate(NAs_betas = colSums(is.na(betas)), detp_01 = colSums(detp>0.01),
+         bc_lessthan_3 = colSums(is.na(bc)), 
+         Poor_quality_probes = NAs_betas + detp_01 + bc_lessthan_3)
+
+#subset out replicates
+dups <- pDat %>% group_by(Sample_Name) %>% filter(n() >1)
+dups_melted <- dups %>% 
+  select(Sample_Name, Replicate_Num, NAs_betas, detp_01, bc_lessthan_3,
+         Poor_quality_probes) %>%
+    melt() %>% as_tibble() %>% 
+  mutate(variable = gsub('NAs_betas', 'Missing values',
+                         gsub('detp_01', 'Detection p > 0.01',
+                              gsub('bc_lessthan_3', 'Bead count < 3', 
+                                   gsub('Poor_quality_probes', 'Total', variable)))))
+
+
+p1 <- ggplot(dups_melted, aes(x=Replicate_Num, y = value)) +
+  geom_bar(stat='identity') + theme_bw() +coord_flip() + labs(x = '', y = 'count')+
+  facet_grid(Sample_Name~variable, scales = 'free', space = 'free_y') 
+p1
+```
+
+Here we can see that PM167 replicate 2 has a lot more poor quality probes than replicate 1.
+For the other samples, PM139 and PM306, it isn't as clear which sample to keep. (PM139 R2 
+has high number of detection p probes though)
+
+I retain the sample with the least amount of poor quality probes
+
+```{r}
+finalsamples <- pDat %>%  group_by(Sample_Name) %>%
+  filter(Poor_quality_probes == min(Poor_quality_probes)) %>% pull(Replicate_ID) 
+length(finalsamples) # 38 out of 42
+
+# filter dnam data
+pDat <- pDat %>% filter(Replicate_ID %in% finalsamples)
+betas <- betas[,pDat$Replicate_ID]
+rgset <- rgset[,pDat$Replicate_ID]
+detp <- detp[,pDat$Replicate_ID]
+bc <- beadcount(rgset)
+
+#filter snps
+snps_pDat <- tibble(genorep2c_ID = colnames(snps), 
+                    Sample_Name = gsub('_V.*', '', colnames(snps)),
+                    Site = gsub('.*_', '', colnames(snps)))
+all(pDat$Sample_Name %in% snps_pDat$Sample_Name) # 38 == all
+pDat <- pDat %>% ungroup %>% inner_join(snps_pDat, by = 'Sample_Name')
+snps <- snps[,pDat$genorep2c_ID]
+
+#fix sample IDs for all data
+colnames(rgset) <- colnames(betas) <- colnames(snps) <- colnames(detp) <- colnames(bc) <- 
+  pDat$Sample_Name
+```
+
+## Fix pData
+
+```{r}
+des <- read.csv('../../../Data/Robinson/Omni2.5_Array/DES_CASES.CNVproj.csv ') %>% as_tibble()
+setdiff(pDat$Sample_Name, des$Case_ID)
+```
+
+PM321 is the sample with big segmental aneuploidys so I will remove it from this analysis
+
+```{r}
+pDat <- pDat %>% select(-Tissue, -Site) %>% inner_join(des, by = c('Sample_Name' = 'Case_ID'))
+betas <- betas[,pDat$Sample_Name]
+rgset <- rgset[,pDat$Sample_Name]
+```
+
+summary of filtering up till now:
+
+54 samples (mostly batch 3 (higher quality))
+38 samples  with 450k data
+--- 3 of which have been ran more than once, highest quality samples used for analysis
+--- PM321 -> has many large CNVs -> drop
+37 samples final w/matched 450k/omni3.5 data
+
+# 2.0 DNAm preprocessing
+
+## 2.1 Noob + BMIQ
+
+I skip all filtering steps because it won't matter for the predictor
+
+```{r}
+#noob normalization
+mset <- preprocessNoob(rgset)
+bmiq_nofilt <- BMIQ(mset)  
+bmiq_nofilt <- rbind(bmiq_nofilt, getSnpBeta(rgset)) # add snp probes to dnam matrix
+colnames(bmiq_nofilt) <- pDat$Replicate_ID
+dim(bmiq_nofilt) # 485577     37
+```
+
+# 3.0 Infer ethnicity/ancestry
+
+### 450k predictor
+
+To predict ethnicity I will also use these samples as an independent test set and retrain the 
+predictor using only samples not in the 37 sample snp-DNAm roblab dataset
+
+First I load in the training data, and then subset out any samples in the 37 sample dataset. 
+
+```{r}
+pDat_C1_C5 <- readRDS('../../../Robjects_final/02_pDat.rds')
+dim(pDat_C1_C5) # 499 30
+```
+
+27/37 samples overlap with data that I used to train the predictor
+
+```{r}
+pDat_C6 <- pDat %>% 
+  left_join(pDat_C1_C5 %>% select(sampleNames,contains('Prob'), contains('Pred')), 
+            by = c('Sample_Name' = 'sampleNames'))
+
+pDat_C6 %>% filter(is.na(glm_pred)) %>% nrow() # 10 samples that need to be predicted onto
+test_ind <- pDat_C6 %>% filter(is.na(glm_pred))  %>% pull(Replicate_ID)
+```
+
+The 10 remaining samples I need to predict their ethnicity with, which I do using an independently 
+trained predictor (non-rob samples).
+
+Here I load in that predictor
+
+```{r}
+glm_fit <- readRDS('../../../Robjects_final/02_innerCV_glm_fit_logloss.rds')
+pred_10 <- predict(glm_fit[[1]], t(bmiq_nofilt[glm_fit[[1]]$finalModel$xNames ,test_ind]))
+pred_prob <-  predict(glm_fit[[1]], t(bmiq_nofilt[glm_fit[[1]]$finalModel$xNames ,test_ind]),
+                      type = 'prob')
+colnames(pred_prob) <- paste0('Prob_', colnames(pred_prob))
+pred <- data.frame(Replicate_ID = rownames(pred_prob), glm_pred = pred_10) %>% cbind(pred_prob)
+
+# now I need to fill in the pData with these predicted values, only when there are NAs!
+# coalesce is the star
+pDat_C6 <- pDat_C6  %>% 
+  left_join(pred, by = 'Replicate_ID') %>% 
+  mutate(glm_pred = coalesce(glm_pred.x, glm_pred.y),
+         Prob_African = coalesce(Prob_African.x, Prob_African.y),
+         Prob_Asian = coalesce(Prob_Asian.x, Prob_Asian.y),
+         Prob_Caucasian = coalesce(Prob_Caucasian.x, Prob_Caucasian.y)) %>% 
+  select(-contains('.x'), -contains('.y'))
+
+# add other ethnicity variables into pData:
+## add ethnicity2 info to pDat
+pDat_C6 <- pDat_C6 %>% left_join(pDat_C1_C5 %>% select(sampleNames, Ethnicity2), 
+                      by = c('Sample_Name' = 'sampleNames'))
+
+## threshold
+pDat_C6 <- pDat_C6 %>% 
+  mutate(Highest_Prob = case_when(
+            (Prob_African > Prob_Asian) &  (Prob_African > Prob_Caucasian) ~ Prob_African,
+            (Prob_Asian > Prob_African) &  (Prob_Asian > Prob_Caucasian) ~ Prob_Asian,
+            (Prob_Caucasian > Prob_African) &  (Prob_Caucasian > Prob_Asian) ~ Prob_Caucasian),
+         Predicted_ethnicity = case_when(
+            Highest_Prob > 0.8 ~ as.character(glm_pred),
+            Highest_Prob < 0.8 ~ 'Ambiguous'))
+
+## evaluate prediction performance 
+# confusion matrix
+levels <- c("African", "Asian", "Caucasian", "Ambiguous")
+cm <-confusionMatrix(factor(pDat_C6$Predicted_ethnicity, levels = levels),
+                     reference = factor(pDat_C6$Ethnicity2, levels = levels))
+
+# pull out count table of reference classes to calculate proportions
+fr <- table(factor(pDat_C6$Ethnicity2, levels = levels))
+
+# convert to plottable format and add proportion column
+cmt <- cm$table %>% as.data.frame() %>%
+    filter(Reference != 'Ambiguous') %>%
+    mutate(proportion = case_when(
+              Reference=='African' ~ Freq/fr[1],
+              Reference=='Asian' ~ Freq/fr[2],
+              Reference=='Caucasian'~ Freq/fr[3]),
+           Cohort = 'C6')
+
+#print and plot results
+cmt
+cm$overall[1:2]
+
+ggplot(cmt) +
+  geom_tile(aes(x = Prediction, y = Reference, fill = proportion)) +
+  geom_text(aes(x = Prediction, y = Reference, label = Freq), size = 5) +
+  scale_fill_gradient2(low = "white", high = "orange", limits = c(0,1),
+                       breaks = c(0, 0.5, 1.0), 
+                       guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")) +
+  theme_bw(base_size = 12) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_x_discrete(expand = c(0,0)) + 
+  scale_y_discrete(expand=c(0,0))+
+  labs(fill = 'Samples in\nself-reported\nclass (%)\n', 
+       x = 'Predicted Ethnicity', y = 'Self-reported\nEthnicity') +
+  coord_equal()
+```
+write.table(cmt, '../../../Performance_by_dataset.txt', quote = F, row.names= F)
+
+Now I have my probabilities and predicted ethnicity. Let's compare this to genetic ancestry
+
+
+## Genetic ancestry: LEA
+
+I used plink to prepare the data. Mainly to take Giulia's merged data (CNV cases + 1000gp) and filter
+to my samples, and filter for probes, strand flip etc.
+
+See plink folder for details.
+
+Starting with the output from plink processing:
+
+```{r}
+library(LEA)
+# convert ped file to geno file
+#output <- ped2geno("./04_LEA/VY_1KGP_flip_filt.ped", "./04_LEA/VY_1KGP_flip_filt.geno")
+#snmf_proj <- snmf('./04_LEA/VY_1KGP_flip_filt.geno', K = 1:10, seed = 1, entropy = T, project = 'new')
+```
+
+```{r}
+snmf_proj <- load.snmfProject('./VY_1KGP_flip_filt.snmfProject')
+plot(snmf_proj, col = "blue4", cex = 1.4, pch = 19) # cross-entropy
+```
+
+Manual says to pick the 'knee', so k = 3,4,5 is what I consider the knee.
+
+### Qmatrix plotting
+
+Because these samples are in a different order than my methylation data and pdata, I reorder based
+on the fam file.
+
+```{r}
+# subset out my samples, read in fam file for the order of samples in the qmatrix
+fam <- read.table('../../../plink/VY_1KGP_flip.fam', sep = '', header = F)
+fam$V7 <- gsub('PL-', 'PL', fam$V2)
+
+# add ethnicity info to fam 
+Q_res <- fam %>% select(V7, V2) %>% slice(grep('P[LM]{1}', V7)) %>% 
+  left_join(pDat_C6 %>% select(genorep2c_ID, Ethnicity2, Mat_Ethnicity, Predicted_ethnicity), 
+            by = c('V7' = 'genorep2c_ID')) 
+
+# add sample ID info to qmatrices
+K3Q <- Q(snmf_proj, K =3)[1:37,] %>% as_tibble() %>% mutate(K='3', genorep2c_ID = Q_res$V7)
+K4Q <- Q(snmf_proj, K =4)[1:37,] %>% as_tibble() %>% mutate(K='4', genorep2c_ID = Q_res$V7)
+K5Q <- Q(snmf_proj, K =5)[1:37,] %>% as_tibble() %>% mutate(K='5', genorep2c_ID = Q_res$V7)
+
+# rename/reshape for plotting
+K3Q <- K3Q %>% melt() %>% rename(STRUCTURE_component = variable, STRUCTURE_value = value)
+K4Q <- K4Q %>% melt() %>% rename(STRUCTURE_component = variable, STRUCTURE_value = value)
+K5Q <- K5Q %>% melt() %>% rename(STRUCTURE_component = variable, STRUCTURE_value = value)
+
+# I want samples to be ordered by ethnicity, so I rearrange Q_res first, and then the q matrices
+Q_res <- Q_res %>% arrange(Predicted_ethnicity, Ethnicity2, Mat_Ethnicity) %>% 
+  mutate(V7 = factor(V7, levels = V7))
+
+# melt and combine K3 K4 K5 and order by ethnicity
+Qmatrix <- rbind(K3Q, K4Q, K5Q) %>% as_tibble %>% 
+  mutate(genorep2c_ID = factor(genorep2c_ID, levels = levels(Q_res$V7))) 
+
+# sample ethnicity info
+library(tidyr)
+Q_res2 <- Q_res[,-2] %>% gather(key = Ethnicity_variable, value = Ethnicity_value, -V7) %>% 
+  as_tibble() %>% mutate(Ethnicity_variable = factor(case_when(
+    Ethnicity_variable == 'Ethnicity2' ~ 'Self-reported Ethnicity',
+    Ethnicity_variable == 'Mat_Ethnicity' ~ 'Maternal Ethnicity',
+    Ethnicity_variable == 'Predicted_ethnicity' ~ 'Predicted Ethnicity'),
+    levels = c('Predicted Ethnicity', 'Self-reported Ethnicity', 'Maternal Ethnicity')),
+    Ethnicity_value = ifelse(Ethnicity_value == '' | is.na(Ethnicity_value), 'Unavailable',
+                             Ethnicity_value))
+```
+
+Plots
+
+```{r}
+theme_set(theme_gray(base_size = 24))
+basesize <- 16
+col_asian <- '#78B85C'
+col_african <-'#FF6E90'
+col_caucasian <- '#539AB3'
+
+p1 <- ggplot(Q_res2, aes(x = V7, y = Ethnicity_variable)) + 
+  geom_tile(aes(fill = Ethnicity_value)) +
+  scale_fill_manual(values = c('African' = '#F8766D', 'Asian' = '#00BA38', 
+                      'EastAsian' = '#00BA38', 'EastAsian;SouthAsian' = '#DACF55',
+                      'SouthAsian' = '#DACF55', 'Caucasian' = '#619CFF', 'Ambiguous' = 'gray',
+                      'Unavailable' = 'white'),
+                     breaks = c('African', 'EastAsian', 'SouthAsian', 'Caucasian',
+                                'Ambiguous','Unavailable'),
+                    labels = c('African', 'East Asian', 'South Asian', 'Caucasian', 
+                               'Ambiguous', 'Unavailable')) + 
+  scale_x_discrete(expand = c(0, 0)) +coord_equal() + 
+  labs(y = '', x = '', fill = '') +
+  scale_y_discrete(expand = c(0, 0)) +
+  theme_bw(base_size = basesize) +
+  theme(axis.text.x = element_blank(), axis.ticks = element_blank(),
+        axis.text.y = element_text(size = basesize-9),
+        legend.text = element_text(size =basesize-6),
+        legend.key.size = unit(0.4, "cm"),
+        legend.key = element_rect( color = "black"), # add box around legend icons
+        legend.justification = c(0,0.5));p1       # aligns legends
+  
+# plot probabilities above the heatmap
+pDat_plot <- pDat_C6 %>% 
+  select(genorep2c_ID, contains('Prob_', ignore.case=F), -contains('cat'), - contains('con')) %>% 
+  melt() %>%
+  as_tibble() %>% mutate(variable = gsub('Prob_', '', variable)) %>%
+  rename(Prob_Class = variable, Probability = value) %>% 
+  mutate(genorep2c_ID = factor(genorep2c_ID, levels = levels(Q_res2$V7)))
+
+p2 <- ggplot(pDat_plot, aes(x = genorep2c_ID, y = Probability, fill = Prob_Class)) + 
+  geom_bar(stat='identity') +
+  stat_summary(fun.y=sum,geom="bar",show.legend = FALSE) +
+  labs(x = '', y = '', fill ='') +
+  scale_y_discrete(expand = c(0, 0), limits = c(0,1), labels = c(0, 100)) + 
+  scale_x_discrete(expand = c(0,0)) +
+  scale_fill_manual(values = c('African' = col_african, 'Asian' = col_asian, 
+                               'Caucasian' = col_caucasian), 
+                    labels = c('P(African)', 'P(Asian)', 'P(Caucasian)'))+ 
+  theme_bw(base_size = basesize) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), 
+        axis.title.y = element_text(angle = 0),
+        panel.background =  element_blank(), legend.box.margin = margin(c(0,0,0,0)),
+        legend.justification = c(0,0.5),
+        legend.text = element_text(size =basesize-6),
+        legend.key.size = unit(0.4, "cm"),
+        legend.key = element_rect(fill = "white", colour = "black"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+  coord_fixed(ratio = 8);p2
+
+
+# plot Q matrices
+p3 <- ggplot(Qmatrix %>% filter(K == '3') %>% 
+               mutate(STRUCTURE_component = 
+                        factor(STRUCTURE_component, levels(STRUCTURE_component)[c(2,3,1)])),
+             aes(x = genorep2c_ID, y = STRUCTURE_value, fill = STRUCTURE_component)) + 
+  geom_bar(stat='identity') + 
+  labs(x = 'Samples', y = '',fill ='') +
+  scale_y_discrete(expand=c(0,0), limits = c(0,1), labels = c(0,100)) + 
+  scale_x_discrete(expand=c(0,0)) +
+  scale_fill_manual(values = c('V2' = col_african, 'V3' = col_asian, 'V1' = col_caucasian),
+                    labels = c('Population 1', 'Population 2','Population 3'))+ 
+  theme_bw(base_size = basesize) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), 
+        axis.title.y = element_text(angle = 0),
+        panel.background =  element_blank(), 
+        legend.box.margin = margin(c(0,0,0,0)),
+        legend.justification = c(0,0.5),
+        legend.text = element_text(size =basesize-6),
+        legend.key.size = unit(0.4, "cm"),
+        legend.key = element_rect(fill = "white", colour = "black"),
+        plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+  coord_fixed(ratio = 8);p3
+  
+library(cowplot)
+
+p4 <- plot_grid(p1,p2,p3, ncol = 1, align = 'v', 
+                labels = c('(A)', '(B)', '(C)'), label_size = basesize+4);p4
+```
+
+ggsave(plot = p4, filename = "../../../Results/04_C6_genetic_ancestry.tiff", h = 6, w = 13.5*3/5) 
+
+# 4.0 Save pData
+
+Here I save the sample information
+
+```{r}
+pDat_C1_C5_final <- readRDS('../../../Robjects_final/03_final_pData.rds')
+pDat_C6_final <- pDat_C6 %>% 
+  rename(sampleNames = Sample_Name, Villi_site = genorep2c_ID,
+         Predicted_ethnicity2 = Predicted_ethnicity, Predicted_ethnicity1 = glm_pred,
+         Self_reported_ethnicity = Ethnicity2) %>%
+  select(sampleNames:Site, contains('AIMs'), Self_reported_ethnicity, contains('Predicted'),
+         Highest_Prob, Prob_African:Prob_Caucasian)
+
+pDat_C6_final<- pDat_C6_final %>% 
+  left_join(pDat_C1_C5_final %>% select(sampleNames, Alternate_ID, GSE_Accession,
+                                        contains('Cohort'))) %>%
+  select(sampleNames, Alternate_ID:Cohort_ID, Self_reported_ethnicity, Predicted_ethnicity1, 
+         Predicted_ethnicity2, contains('Prob', F), contains('AIMs'), Sample_Plate:Site)
+pDat_C6_final
+```
+
+saveRDS(pDat_C6_final, '../../../Robjects_final/04_final_pData_C6.rds')
+write.table(pDat_C6_final, '../../final_pData.txt', quote=F, row.names = F, sep = '\t')

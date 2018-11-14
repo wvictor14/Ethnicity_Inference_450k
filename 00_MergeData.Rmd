@@ -1,0 +1,1059 @@
+---
+title: "00_MergeData"
+author: "Victor Yuan"
+date: "October 24, 2018"
+output:
+  html_document:
+    keep_md: true
+    toc: true
+    toc_float: true
+    toc_depth: 2
+editor_options: 
+  chunk_output_type: console
+---
+
+This script is for the merging, quality control, and preprocessing of all placental data.
+
+
+# 1.0 Create Fry data
+
+First I extract the Fry data from GEO data files which I already downloaded.
+
+## 1.1 Load libraries and data
+
+```{r load libraries}
+#source("http://www.bioconductor.org/biocLite.R")
+#biocLite(c("BiocParallel"))
+library(minfi)
+library(GEOquery)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+library(ggplot2)
+library(pheatmap)
+library(dplyr)
+```
+
+(Below is Magda's code)
+
+Dataset: GSE73375 Fry
+
+Load GEO data
+```{r load GEO data}
+GSE75 <- getGEO(filename = "../../data/GSE73375_family.soft.gz") # takes a few minutes
+
+# Here are some things we can access from GSE75
+Meta(GSE75) # top-level series information 
+Meta(GPLList(GSE75)[[1]]) # platform information
+Meta(GSMList(GSE75)[[1]]) # information for the 1st sample in GSE73375
+Table(GSMList(GSE75)[[1]])[1:5,] # this contains beta values and detection p values for sample 1
+Columns(GSMList(GSE75)[[36]])[1:3,] # description of columns for sample 36
+```
+
+The next step is to extract the data we want from the complex gse format and get it into an 
+expression dataset that we know how to work with.
+
+Step 1: Check that all data is on the same platform
+```{r platform check}
+lapply(GSMList(GSE75),function(x) {Meta(x)$platform})
+```
+  > all are same platform
+
+## 1.2 get Betas
+
+Step 2: Extract matrix of *beta values*, keeping probe order (i.e. rows) constant
+```{r extract betas}
+#Take order of probes from the 1st sample
+probesets <- Table(GSMList(GSE75)[[1]])[,1]
+
+#Create matrix of beta values
+data.matrix <- do.call('cbind',lapply(GSMList(GSE75),function(x)
+ {tab <- Table(x)
+ mymatch <- match(probesets,tab$ID_REF)
+ return(tab$VALUE[mymatch])
+ }))
+data.matrix <- apply(data.matrix,2,function(x) {as.numeric(as.character(x))})
+rownames(data.matrix) <- probesets
+colnames(data.matrix) <- names(GSMList(GSE75))
+
+#Sanity check - make sure numbers are in the same order
+data.matrix[1:5,]
+Table(GSMList(GSE75)[[1]])[1:5,]
+Table(GSMList(GSE75)[[10]])[1:5,]
+```
+
+Get detect p
+
+Step 3: Extract matrix of *detection P Values*, keeping probe order (i.e. rows) constant
+```{r extract detection p values}
+#Create matrix of detection P values 
+detect.matrix <- do.call('cbind',lapply(GSMList(GSE75),function(x)
+ {tab <- Table(x)
+ mymatch <- match(probesets,tab$ID_REF)
+ return(tab[,3][mymatch]) # had to change the code because the detection p val columns are not consistently named!
+ }))
+detect.matrix <- apply(detect.matrix,2,function(x) {as.numeric(as.character(x))})
+rownames(detect.matrix) <- probesets
+colnames(detect.matrix) <- names(GSMList(GSE75))
+
+#Sanity check GSM1892031 [7] row 65 should be 0.00333
+detect.matrix[65,1:10]
+Table(GSMList(GSE75)[[7]])[65,]
+Table(GSMList(GSE75)[[1]])[65,]
+```
+
+## 1.3 get pData
+
+```{r extract pData}
+head(pData1 <- sapply(GSMList(GSE75),function(x) {Meta(x)$characteristics_ch1}))
+pData1 <- gsub("diagnosis: ", "", 
+							gsub("tissue: ", "",
+									 gsub("maternal age: ", "",
+									 		 gsub("gestational age: ", "",
+									 		 		 gsub("race: ", "", pData1)))))
+rownames(pData1) <- c("diagnosis", "tissue", "matAge", "ethnicity", "GA_2")
+head(pData1 <- as.data.frame(t(pData1)))
+
+#Format pData variables
+pData1$matAge <- as.integer(pData1$matAge)
+pData1$GA <- as.integer(pData1$GA_2)
+```
+
+## 1.5 get meth/unmeth
+
+This data was stored seperately as a supplementary file in GEO
+```{r}
+#Read in the 1st 5 lines of the file
+test <- read.delim("../../data/GSE73375_Unmethylated_and_methylated_signal.txt") 
+colnames(test) # The file contains Methylated, Unmethylated and detection P values for all the samples. Though it seems that there is a different naming convension in this file.
+
+# It looks like what I saw here:
+sapply(GSMList(GSE75),function(x) {Columns(x)[3,1]}) 
+
+# I can use this as a key to match the GSM numbers with the P/Q notation used elsewhere.
+sampleKey <- cbind(sapply(GSMList(GSE75),function(x) {Columns(x)[3,1]}), names(GSMList(GSE75)))
+all(rownames(sampleKey) == sampleKey[,2])
+pubName <- substr(sampleKey[,1],10,12)
+sampleKey <- cbind(sampleKey, pubName)
+pData1 <- merge(pData1, sampleKey[,2:3], by = 0)
+
+# Seperate the test data into 3 matricies: Detection.Pval, Unmethylated.Signal and Methylated.Signal
+rownames(test) <- test[,1]
+test <- test[,-1]
+
+Detection.1 <- test[,grep(".Detection.Pval", colnames(test))]
+colnames(Detection.1) <- gsub(".Detection.Pval", "", colnames(Detection.1))
+colnames(Detection.1) #36
+
+unmeth.1 <- test[,grep(".Unmethylated.Signal", colnames(test))]
+colnames(unmeth.1) <- gsub(".Unmethylated.Signal", "", colnames(unmeth.1))
+colnames(unmeth.1) #36
+
+meth.1 <- test[,grep(".Methylated.Signal", colnames(test))]
+colnames(meth.1) <- gsub(".Methylated.Signal", "", colnames(meth.1))
+colnames(meth.1) #36
+
+#Shit! The samples don't seem to be named correctly!!! have e-mailed the authors of the article & GEO to try to resolve this...
+#** resolved - they uploaded a new file with the correct information 
+```
+
+```{r}
+# Here I check that the cpgs are all present in each meth, unmeth, and detect p matrixes, and the order is consistent
+identical(rownames(meth.1), rownames(unmeth.1))
+identical(rownames(meth.1), rownames(Detection.1))
+
+# Now I check that the samples are in the same order
+identical(colnames(meth.1), colnames(unmeth.1))
+identical(colnames(meth.1), colnames(Detection.1))
+```
+
+[End of Magda's code]
+
+Here I try to reconstruct a genomic ratio set object. Here is an outline of what I am trying to do:
+
+GenomicMethylSet(gr =  gr[ind2,],
+                            Meth = mat[ind1,mindex],
+                            Unmeth = mat[ind1,uindex],
+                            pData = pData,
+                            preprocessMethod = preprocessing,
+                            annotation = c(array=array,annotation=annotation))
+
+array = "IlluminaHumanMethylation450k",
+                            annotation=.default.450k.annotation)
+                            
+ann <- .getAnnotationString(c(array=array,annotation=annotation))
+object <- get(ann)
+gr <- getLocations(object, mergeManifest = mergeManifest,
+                                 orderByLocation = TRUE)
+locusNames <- names(gr)
+common <- intersect(locusNames,rownames(mat))
+ind2 <- match(common,locusNames)
+
+## 1.6 create methylset
+
+```{r}
+# the ann string should look like this: 
+array = "IlluminaHumanMethylation450k"
+annotation = "ilmn12.hg19"
+object <- get("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+
+# Next I grab the locations of each probe
+gr <- getLocations(object, mergeManifest = F, orderByLocation = T)
+
+# Grab the cpg identifiers
+locusNames <- names(gr)
+
+common <- intersect(locusNames,rownames(data.matrix))
+length(common) # 485512 missing the snps probes
+length(rownames(data.matrix)) # 485577 
+
+ind1 <- match(common,rownames(meth.1))
+ind2 <- match(common,locusNames)
+pData1$sampleID <- rownames(pData1)
+rownames(pData1) <- pubName[pData1$pubNam]
+```
+
+This code to make a gmset returns a pData error. I think this is a problem with minfi. Check issues in github repo
+
+GenomicMethylSet(
+  gr = gr[ind2,],
+  Meth = meth.1[ind1,],
+  Unmeth = unmeth.1[ind1,],
+  pData = pData1,
+  preprocessMethod = 'no preprocessing',
+  annotation = c(array=array,annotation=annotation)
+) 
+
+Instead, I create an mset here:
+
+```{r create mset}
+mset <- new("MethylSet",
+        SummarizedExperiment(assays = SimpleList(Meth = as.matrix(meth.1), 
+                                                 Unmeth = as.matrix(unmeth.1))),
+        annotation = c(array="IlluminaHumanMethylation450k",annotation="ilmn12.hg19"),
+        preprocessMethod = c(rg.norm='Raw (no normalization or bg correction)',
+                            minfi='1.24.0', manifest='0.4.0'))
+pData(mset) <- DataFrame(pData1) # add in pData
+mset
+```
+
+Now I check if the mset is working properly
+
+```{r check mset}
+gset <- mapToGenome(ratioConvert(mset))
+
+#plot density, if the meth/unmeth intensities are flipped, then the hypermethylated peak will be bigger than the hypomethylated peak.
+#this has been fixed**
+beta <- as.data.frame(getBeta(mset))
+head(beta)
+ggplot(beta, aes(x=P1)) +
+  geom_density()
+```
+
+## 1.7 Infer Sex
+
+Here I infer sex as sex information was not provided.
+
+```{r sex_prediction_minfi_1}
+ggplot(getSex(gset, cutoff = -2) %>% as.data.frame(), aes(x = xMed, y = yMed)) +
+  geom_point(aes(col = predictedSex))
+
+# Add predicted Sex to metadata
+pDat <- as.data.frame(pData(mset))
+pDat$Sex <- getSex(gset, cutoff = -2)$predictedSex   # add minfi sex prediction results
+pData(mset) <- DataFrame(pDat)
+```
+
+Now I cluster based on XY probes 
+
+```{r cluster_XY}
+# Filter based on xy probes
+ann450k = getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+sexCh <- featureNames(gset) %in% ann450k$Name[ann450k$chr %in% c('chrX', 'chrY')] 
+gsetXY <- gset[sexCh,]
+
+# extract beta values
+betaXY <- getBeta(gsetXY)
+
+# Generate heatmap, can choose to cluser rows / cols, and the labels (e.g. Sex, PredictedSex, Sample_Group)
+pheatmap(cor(betaXY, use = 'pairwise.complete.obs'), 
+         cluster_rows=T, cluster_cols=T, 
+         annotation_col = pDat %>% dplyr::select(Sex), 
+         main = 'Clustering on Sex Chromosomes', 
+         show_rownames = F, show_colnames = F)
+```
+
+## 1.8 Save data
+
+great, now I save the mset to load later. I'll put this in the server Z:/ drive in my R objects folder there, with the other data, after.
+
+I also save the detection p value matrix, because that will be useful too.
+
+```{r save mset, eval = F}
+saveRDS(mset, "../../Robjects/01_mset_Fry.rds")
+head(detect.matrix)
+colnames(detect.matrix) <- as.character(
+  pubName[match(colnames(detect.matrix), names(pubName))]
+)
+saveRDS(detect.matrix, "../../Robjects_final/00_detectP_Fry.rds")
+```
+
+```{r}
+mset_Fry <- mset
+detp_Fry <- detect.matrix
+```
+
+# 2.0 Create Michels
+
+## 2.1 Load Libraries and Data
+
+```{r}
+lapply(paste('package:',names(sessionInfo()$otherPkgs),sep=""),detach,character.only=TRUE,unload=TRUE)
+
+library(minfi)
+library(methylumi)
+library(pheatmap)
+library(dplyr)
+
+# load data
+load('../../data/Michels/GSE70453 for Ethnicity.RData')
+```
+
+## 2.2 Clean pData
+
+Here I edit the Michels pData
+
+And for ethnicity, this information was taken from the email from Dr. Binder: 
+
+'...the associated pData matrix includes gestational diabetes status (1=yes, 0=no), and an indicator for maternal ethnicity (1=white (not of Hispanic origin),  3=Hispanic or Latino,  4= Asian/Pacific Islander,  5=Black/African-American).'
+
+```{r clean_pdat}
+#check pdata
+pDat <- pData(lumiMethy.GDM)
+head(pDat)
+
+#edit variables
+pDat$PE <- FALSE # no preeclampsia
+pDat$PE <- as.factor(pDat$PE)
+
+colnames(pDat)[1:3] <- c('sampleNames', 'Condition', 'Ethnicity') # rename to match template colnames
+
+pDat$Condition <- gsub('0', 'CONTROL',
+                      gsub('1', 'GDM', pDat$Condition)) # rename condition variable
+
+pDat$Ethnicity <- gsub('1', 'Caucasian',
+                       gsub('3', 'Hispanic',
+                            gsub('4', 'Asian',
+                                 gsub('5', 'African', pDat$Ethnicity)))) #rename ethnicity
+```
+
+## 2.3 Make methylset
+
+Here I coerce the methylumiset object into a minfi methylset object
+
+```{r make_mset}
+LumiToMset <- function(MethyLumiSet, pDat=NULL, array=NULL,annotation=NULL, preprocessing=NULL){
+  m <- methylated(MethyLumiSet)
+  u <- unmethylated(MethyLumiSet)
+  
+  if (is.null(preprocessing)){
+     p <- c(rg.norm = 'Raw (no normalization or bg correction)', minfi = '1.24.0', manifest = '0.4.0')
+  } else {
+     p <- preprocessing
+  }
+ 
+  if (is.null(array)){
+    array <- "IlluminaHumanMethylation450k"
+  } else {
+    array <- array
+  }
+  
+  if (is.null(annotation)){
+    annotation <- "ilmn12.hg19"
+  } else {
+    annotation <- annotation
+  }
+  
+  mset <- new("MethylSet",
+        SummarizedExperiment(assays = SimpleList(Meth = m, Unmeth = u)), #taken from github ./master/R/mset.R
+        annotation = c(array=array,annotation=annotation),
+        preprocessMethod = p
+        )
+  if (is.null(pDat)){
+    pData(mset) <- DataFrame(pData(MethyLumiSet))
+  }
+  
+  if(all(identical(rownames(pDat), colnames(mset)))) {
+      pData(mset) <- DataFrame(pDat)
+    } else {
+    stop('pDat rownames do not match colnames of MethyLumiSet')
+  }
+  
+  return(mset)
+}
+
+mset <- LumiToMset(lumiMethy.GDM, pDat = pDat)
+mset
+```
+
+## 2.4 Infer sex
+
+Here I infer sex
+
+```{r}
+#map cpgs to genome
+gset <- mapToGenome(ratioConvert(mset))
+```
+
+Here i use minfi's built in sex prediction function
+
+```{r sex_prediction_minfi}
+ggplot(getSex(gset, cutoff = -2) %>% as.data.frame(), aes(x = xMed, y = yMed)) +
+  geom_point(aes(col = predictedSex))
+
+# Add predicted Sex to metadata
+pDat$MinfiPredictedSex <- getSex(gset, cutoff = -2)$predictedSex   # add minfi sex prediction results
+```
+
+Now I cluster based on XY probes 
+
+```{r cluster_XY_2}
+# Filter based on xy probes
+ann450k = getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+sexCh <- featureNames(gset) %in% ann450k$Name[ann450k$chr %in% c('chrX', 'chrY')] 
+gsetXY <- gset[sexCh,]
+
+# extract beta values
+betaXY <- getBeta(gsetXY)
+
+# Generate heatmap, can choose to cluser rows / cols, and the labels (e.g. Sex, PredictedSex, Sample_Group)
+pheatmap(cor(betaXY, use = 'pairwise.complete.obs'), 
+         cluster_rows=T, cluster_cols=T, 
+         annotation_col = pDat %>% select(MinfiPredictedSex), 
+         main = 'Clustering on Sex Chromosomes', 
+         show_rownames = F, show_colnames = F)
+```
+
+In this case, the clustering  is very clear, and shows that these samples can be divided into females and males. Normally, I would go further and look at sex-specific methylated genes, like XIST and AR, but in this case, the clustering is convincing enough for me.
+
+For consistency with the other data, I relabel this variable: 'PredictedSex' -> 'Sex'
+
+```{r}
+colnames(pDat)[5] <- 'Sex'
+```
+
+## 2.5 Save mset
+
+```{r eval = F}
+all(identical(colnames(mset), rownames(pDat)))
+pData(mset) <- DataFrame(pDat)
+saveRDS(mset, '../../Robjects/01_mset_michels.rds')
+```
+
+```{r}
+mset_Mic <- mset
+```
+
+# 3.0 Merge Rob Mar Cox
+
+This is where I merge datasets consisting of idats: the Robinson, Cox, and Marsit data. I save the final object with all metadata information (for others to use). Note that my final merged object will contain samples without irrelevant metadata, and will not exclusively contain samples with ethnicity of interest (Caucasian, Asian: south/east, African).
+
+## 3.1 Load libraries and data
+
+```{r Load_libraries, message = FALSE, warning = FALSE}
+#detach current libraries libraries
+lapply(paste('package:',names(sessionInfo()$otherPkgs),sep=""),detach,character.only=TRUE,unload=TRUE)
+
+library(minfi)
+library(dplyr)
+library(stringr)
+library(methylumi)
+```
+
+```{r load_Roblabdata, warning = FALSE, message = FALSE, eval = TRUE}
+#samplesheet
+ss_Rob <- read.metharray.sheet(base = '../../data/Robinson/IDATs', recursive = T)
+
+rgset_Rob <- read.metharray.exp(targets = ss_Rob, recursive = TRUE, verbose = TRUE, extended = TRUE)
+```
+
+```{r load COX, warning = FALSE, message = FALSE, eval = TRUE}
+ss_Cox <- read.metharray.sheet('../../data/Cox', pattern = 'des')
+rgset_Cox <- read.metharray.exp(targets = ss_Cox, verbose = TRUE, extended = TRUE)
+```
+
+Marsit data didn't contain any samplesheet, so I will load in the idats without one first. And then I will manually construct the metadata df.
+
+```{r load marsit data, warning = FALSE, message = FALSE, eval = TRUE}
+rgset_Mar <- read.metharray.exp(base = '../../data/GSE75248 - Marsit/IDATS', verbose = TRUE, extended = TRUE)
+rgset_Mar
+
+#load ethnicty R object
+load(file = '../../data/GSE75248 - Marsit/GSE75428.EthnicityData.RData')
+```
+
+## 3.2 Edit Meta data
+
+Here I edit the metadata to make everything consistent. And then I combine the arrays, and save that object for others to use. Then, I will edit the metadata again to fit my specific purpose (ethnicity), and do a filter based on ethnicity.
+
+Next, I make sure the same column names are present in des matrices, and remove any extraneous information. I will start by making Cox and Rob des consistent, since Marsit has no metadata attached currently.
+
+```{r edit des, eval = TRUE}
+names(pData(rgset_Rob)) 
+names(pData(rgset_Cox))
+
+pDat_cox <- pData(rgset_Cox)
+pDat_rob <- pData(rgset_Rob)
+colnames(pDat_cox) <- gsub('ParticipantID', 'sampleNames', colnames(pDat_cox)) # sampleNames
+colnames(pDat_rob) <- gsub('Sample_Plate', 'Plate', colnames(pDat_rob))        # plate
+
+trim <- function (x) gsub("^\\s+|\\s+$", "", x) # remove white space from sex and coerce to factor
+pDat_cox$Sex <- as.factor(pDat_cox$Sex)         # coerce strings to factors
+pDat_rob$Sex <- as.factor(trim(pDat_rob$Sex))
+pDat_rob$Plate <-as.factor(pDat_rob$Plate)
+pDat_rob$Condition <-as.factor(pDat_rob$Condition)
+
+# add dataset identifier
+pDat_rob$Dataset <- as.factor('Robinson')
+pDat_cox$Dataset <- as.factor('Cox')
+
+# coerce some columns to factors
+pDat_rob$Array <- as.factor(pDat_rob$Array)
+pDat_rob$Slide <- as.factor(pDat_rob$Slide)
+
+pDat_cox$GRP <- as.factor(pDat_cox$GRP)
+pDat_cox$GRP.2 <- as.factor(pDat_cox$GRP.2)
+pDat_cox$Plate <- as.factor(pDat_cox$Plate)
+pDat_cox$IUGR <- as.factor(pDat_cox$IUGR)
+pDat_cox$CH <- as.factor(pDat_cox$CH)
+pDat_cox$Slide <- as.factor(pDat_cox$Slide)
+pDat_cox$Array <- as.factor(pDat_cox$Array)
+pDat_cox$Ethnicity <- as.factor(pDat_cox$Ethnicity)
+```
+
+The keeps object contains the information I will keep for my specfic project, however for others I will leave in the other columns in case people want that information (like condition). I move this filtering step to section 1.4
+
+Because the marsit data wasn't loaded with a samplesheet, there is no information in the metadata slot of the rgset.
+I will manually create the data using the ethnicity R object magda has obtained from the authors.
+
+```{r create_Marsit_pDat, eval = TRUE}
+# inspect ethnicity object
+str(GSE75248.EthnicityData)
+head(GSE75248.EthnicityData)
+rownames(GSE75248.EthnicityData) <- gsub('[\t]', '', rownames(GSE75248.EthnicityData)) # remove tab delimiter
+
+# Create meta data
+pDat_mar <- pData(rgset_Mar) 
+
+pDat_mar$sampleNames <- (str_sub(rownames(pDat_mar), start = 1, end = 10)) # input sample names, removing slide/array
+pDat_mar$Slide <- as.factor(str_sub(rownames(pDat_mar), start = 12, end = 21)) # input slide
+pDat_mar$Array<- as.factor(str_sub(rownames(pDat_mar), start = 23, end = nchar(rownames(pDat_mar))))
+rownames(pDat_mar) <- str_sub(rownames(pDat_mar), start = 12, end = nchar(rownames(pDat_mar)))
+pDat_mar$Ethnicity <- GSE75248.EthnicityData[match(rownames(pDat_mar), rownames(GSE75248.EthnicityData)),'FetalEthnicity']
+pDat_mar$GA <- GSE75248.EthnicityData[match(rownames(pDat_mar), rownames(GSE75248.EthnicityData)), 'GestationalAgeWeeks']
+pDat_mar$MaternalEthnicity <- GSE75248.EthnicityData[match(rownames(pDat_mar),                                                          rownames(GSE75248.EthnicityData)),'MaternalEthnicity']
+pDat_mar$Dataset <- as.factor('Marsit')
+pDat_mar$Sex <- as.factor(NA)
+
+head(pDat_mar)
+pData(rgset_Mar) <- pDat_mar
+```
+
+Make columns consistent 
+
+I need to make the content of the columns consistent before merging
+
+Magda downloaded the geo data in 01_Merge Marsit and Robinson.RMD, which I will load here as .Rdata to obtain the metadata (sex and Condition) that I am missing.
+
+```{r load additional mar data, eval = TRUE}
+load("../../data/GSE75248 - Marsit/GSE75248.RData")
+pDat_marG <- pData(GSE48)
+
+sum(pDat_mar$sampleNames %in% rownames(pDat_marG)) # 335
+
+#Sex, plate, Condition
+pDat_mar$Sex <- pDat_marG[match(pDat_mar$sampleNames,rownames(pDat_marG)), 'sex']
+pDat_mar$Sex <- as.factor(gsub('Female', 'F', pDat_mar$Sex))
+pDat_mar$Sex <- as.factor(gsub('Male', 'M', pDat_mar$Sex))
+pDat_mar$Plate <- as.factor(pDat_marG[match(pDat_mar$sampleNames,rownames(pDat_marG)), 'Sample_plate'])
+pDat_mar$Condition <- as.factor(pDat_marG[match(pDat_mar$sampleNames,rownames(pDat_marG)), 'condition'])
+rm(GSE48)
+```
+
+```{r Make columns consistent, eval = TRUE}
+names(pDat_mar)
+names(pDat_cox) # GRP = cox diagnosis, GRP.2 = our diagnosis
+names(pDat_rob)
+
+# make column names the same
+# sampleNames, Slide, Array, Plate, Ethnicity, GA, Dataset, Condition, Sex
+pDat_cox$Condition <- pDat_cox$GRP.2
+pDat_cox <- subset(pDat_cox, select = -GRP.2)
+
+# add columns that are missing
+# MaternalEthnicity, GRP, IUGR, BW, BW_SD, CH
+c('MaternalEthnicity', 'GRP', 'IUGR', 'BW', 'BW_SD', 'CH') %in% colnames(pDat_mar)
+c('MaternalEthnicity', 'GRP', 'IUGR', 'BW', 'BW_SD', 'CH') %in% colnames(pDat_cox)
+c('MaternalEthnicity', 'GRP', 'IUGR', 'BW', 'BW_SD', 'CH') %in% colnames(pDat_rob)
+
+pDat_mar$GRP <- NA
+pDat_mar$IUGR <- NA
+pDat_mar$BW <- NA
+pDat_mar$BW_SD <- NA
+pDat_mar$CH <- NA
+
+pDat_cox$MaternalEthnicity <- NA
+
+pDat_rob$MaternalEthnicity <- NA
+pDat_rob$GRP <- NA
+pDat_rob$IUGR <- NA
+pDat_rob$BW <- NA
+pDat_rob$BW_SD <- NA
+pDat_rob$CH <- NA
+
+c('MaternalEthnicity', 'GRP', 'IUGR', 'BW', 'BW_SD', 'CH') %in% colnames(pDat_mar)
+c('MaternalEthnicity', 'GRP', 'IUGR', 'BW', 'BW_SD', 'CH') %in% colnames(pDat_cox)
+c('MaternalEthnicity', 'GRP', 'IUGR', 'BW', 'BW_SD', 'CH') %in% colnames(pDat_rob)
+
+pData(rgset_Mar) <- pDat_mar
+pData(rgset_Cox) <- pDat_cox
+pData(rgset_Rob) <- pDat_rob
+```
+
+## 3.3 Merge Data
+
+```{r combinearrays, eval = TRUE}
+rgset <- combineArrays(rgset_Rob, rgset_Cox)
+pData(rgset) <- pData(rgset)[,1:ncol(pData(rgset))-1] # remove arraytype column
+rgset <- combineArrays(rgset, rgset_Mar, outType = 'IlluminaHumanMethylation450k')
+pData(rgset)$Array <- as.factor(pData(rgset)$Array)
+pData(rgset)$Slide <- as.factor(pData(rgset)$Slide)
+pData(rgset) <- pData(rgset)[,1:ncol(pData(rgset))-1] # remove arraytype column
+```
+
+Save Combined Data
+
+This data contains the full robinson cox and marsit datasets, without any filtering done.
+
+```{r save rgset, eval = FALSE}
+saveRDS(rgset, '../../Robjects/rgset_RobCoxMarsit.rds')
+```
+
+Load Combined Data
+
+```{r load combined data, eval = FALSE}
+rgset <- readRDS('../../Robjects/rgset_RobCoxMarsit.rds')
+```
+
+# 4.0 Merge All data
+
+This script is for merging all of the data
+
+**Note** make sure to run this twice if running the whole pipeline. Will need 
+two ethnicity filtered msets: one with noob normalization and one without noob
+normalization of the rob/cox/marsit samples. This is so we can track quality
+improvement throughout the entire processing pipeline. **end note**
+
+This script is for merging Fry and Michels (FM) datasets with the combined Rob-Cox-Marsit (RCM) data. The reason I didn't merge all 5 datasets together at once was because RCM data is available as idats, which makes things easier, whereas the FM data is only available as matrices of meth/unmeth/detect p val.
+
+I previously already converted Michels and Fry data into a methylset object manually (in 01...Rmd)
+
+Note, that I do noob normalization on the RCM data before combining, and then I 
+rerun the script with no normalization to create a second mset_RCMFM object. 
+
+RCM       ----------------> RCM
+rgset     preprocessNoob    mset
+          /preprocessRaw
+
+RCM   +  FM                 RCMFM
+mset  +  mset ------------> mset
+              combineArrays    
+
+## 4.1 Libraries and data
+
+```{r load_libraries_and_data , message = FALSE}
+rm(ann450k, beta, betaXY, data.matrix, GSE75, gset, gsetXY, lumiMethy.GDM, rgset_Cox, rgset_Mar,
+   rgset_Rob)
+#detach current libraries libraries
+lapply(paste('package:',names(sessionInfo()$otherPkgs),sep=""),detach,character.only=TRUE,unload=TRUE)
+
+#source("https://bioconductor.org/biocLite.R")
+#biocLite(c('S4Vectors'))
+library(minfi)
+library(dplyr)
+library(BiocGenerics)
+```
+
+Here I load the rcm dataset. After merging with the fry and michels, I filter based on ethnicity.
+
+```{r load_data}
+rgset_RCM <- rgset;rm(rgset)
+
+# convert to methylsets to merge
+mset_RCM <- preprocessNoob(rgset_RCM) # noob normalize
+
+mset_Fry 
+mset_Mic
+```
+
+## 4.2 load snp info
+
+In converting an rgset to a mset, snp probes are dropped. This is a default effect of the minfi functions. 
+Here I manually put them back in for the RCM mset.
+
+I start by obtaining the methylated and unmethylated instensities of  snp probes for RCM.
+Then I break down mset_RCM into it's components, add in the snp data, and reconstruct the mset.
+
+```{r getSNP_RCM}
+#get snp probes meth/unmeth intensities
+#for type two snp probes, green = meth, red = unmeth
+snpProbesII <- getProbeInfo(rgset_RCM, type = "SnpII")$Name
+M.II <- getGreen(rgset_RCM)[getProbeInfo(rgset_RCM, type = "SnpII")$AddressA,,drop=FALSE]
+U.II <- getRed(rgset_RCM)[getProbeInfo(rgset_RCM, type = "SnpII")$AddressA,,drop=FALSE]
+
+#for type I snp probes, meth and unmeth may either be red or green, depending on the site
+# for type I snp probes, the methylated and unmethylated probe are always measured in the same color channel. measurements in the other color channel are considered 'out of band' measurements.
+snpProbesI.Green <- getProbeInfo(rgset_RCM, type = "SnpI")[getProbeInfo(rgset_RCM, type = "SnpI")$Color=="Grn",,drop=FALSE]
+snpProbesI.Red <- getProbeInfo(rgset_RCM, type = "SnpI")[getProbeInfo(rgset_RCM, type = "SnpI")$Color=="Red",,drop=FALSE]
+
+# get meth/unmeth matrices for 'red' type I probes
+M.I.Red <- getRed(rgset_RCM)[snpProbesI.Red$AddressB,,drop=FALSE]
+U.I.Red <- getRed(rgset_RCM)[snpProbesI.Red$AddressA,,drop=FALSE]
+# get meth/unmeth matrices for 'green' type I probes
+M.I.Green <- getGreen(rgset_RCM)[snpProbesI.Green$AddressB,,drop=FALSE]
+U.I.Green <- getGreen(rgset_RCM)[snpProbesI.Green$AddressA,,drop=FALSE]
+    
+M <- rbind(M.II, M.I.Red, M.I.Green)
+U <- rbind(U.II, U.I.Red, U.I.Green)
+rownames(M) <- rownames(U) <- c(snpProbesII, snpProbesI.Red$Name, snpProbesI.Green$Name)
+```
+
+To add snp probe measurements to the mset, I take out the meth/unmeth matrices from the mset, concatenate the two pairs of meth/unmeth matrices, and reconstruct the mset.
+
+mset --> meth/unmeth (no snp probes) -----------------------> meth/unmeth (with snp probes)
+                                      add in snp meth/unmeth
+
+-----> reconstruct mset
+
+```{r addSNP_RCM}
+#get meth/unmeth matrics
+meth <- getMeth(mset_RCM)
+unmeth <- getUnmeth(mset_RCM)
+
+identical(colnames(meth), colnames(M))
+identical(colnames(unmeth), colnames(U))
+
+# bind snp meth/unmeth to mset meth/unmeth matrices
+M_all <- rbind(meth, M)
+dim(M_all)
+U_all <- rbind(unmeth, U)
+dim(U_all)
+
+identical(rownames(M_all), rownames(U_all))
+
+#prepare to reconstrusct mset
+preprocessing <- mset_RCM@preprocessMethod
+array = "IlluminaHumanMethylation450k"
+annotation = "ilmn12.hg19"
+
+# Recreate methylset_RCM
+mset_RCM <- new("MethylSet",
+        SummarizedExperiment(assays = SimpleList(Meth = M_all, Unmeth = U_all)), #stolen from github ./master/R/mset.R, # i use unmeth as meth and vice versa becaues the Fry mislabelled - July 26th 2017
+        annotation = c(array=array,annotation=annotation),
+        preprocessMethod = preprocessing
+        )
+pData(mset_RCM) <- pData(rgset_RCM) # add in pData
+mset_RCM #should have 485577 rows
+```
+
+## 4.3 Make phenoData consistent
+
+This section is for making the pData of both objects the same.
+
+```{r}
+pDat_RCM <- as.data.frame(pData(mset_RCM))
+pDat_Fry <- as.data.frame(pData(mset_Fry))
+pDat_Mic <- as.data.frame(pData(mset_Mic))
+
+# variables in RCM that are not in Fry
+names(pDat_Fry)
+names(pDat_RCM)
+
+setdiff(unique(c(names(pDat_RCM), names(pDat_Mic))), names(pDat_Fry))
+
+# Rename variables to make them consistent
+pDat_Fry <- pDat_Fry %>% mutate(sampleNames = as.character(pubName), 
+                                GA = as.numeric(as.character(GA_2)), 
+                                Ethnicity = as.factor(gsub('African American', 'African', ethnicity)),
+                                Condition = as.factor(diagnosis), 
+                                Dataset = as.factor('Fry')) %>%
+                        dplyr::select(Sex, sampleNames, GA, Ethnicity, Condition, Dataset, GA_2, matAge)
+# Manually inspect if any are still labelled differently
+names(pDat_Fry)
+names(pDat_RCM)
+
+# Now input NAs into variables present in RCM and michels but not in Fry:
+setdiff(unique(c(names(pDat_RCM), names(pDat_Mic))), names(pDat_Fry))
+setdiff(names(pDat_Fry), unique(c(names(pDat_RCM), names(pDat_Mic))))
+
+pDat_Fry <- pDat_Fry %>% mutate(Plate = as.factor('X'),  
+                                Array = as.factor('X'), 
+                                Slide = as.factor('X'), 
+                                MaternalEthnicity = as.factor('Unknown'),
+                                IUGR = as.factor('X'),
+                                BW = 'X',
+                                BW_SD = 'X',
+                                CH = 'X',
+                                PE = as.factor(gsub('normotensive', 'FALSE',
+                                                    gsub('preeclamptic', 'TRUE', Condition))))
+#input missing variables into pDat_Mic
+names(pDat_Mic)
+names(pDat_Fry)
+setdiff(unique(c(names(pDat_RCM), names(pDat_Fry))), names(pDat_Mic))
+
+pDat_Mic <- pDat_Mic %>% mutate(Plate = as.factor('X'), 
+                                GA = 'X',
+                                GA_2 = as.factor('X'),  
+                                Array = as.factor('X'), 
+                                Slide = as.factor('X'),
+                                Dataset = as.factor('Michels'),
+                                MaternalEthnicity = 'X',
+                                IUGR = as.factor('X'),
+                                BW = 'X', BW_SD = 'X',
+                                CH = 'X',
+                                matAge = as.factor('X'),
+                                Sex = as.factor('X'))
+
+#input missing variables into pDat_RCM
+setdiff(unique(c(names(pDat_Mic), names(pDat_Fry))), names(pDat_RCM))
+table(pDat_RCM$Condition)
+pDat_RCM <- pDat_RCM %>% mutate(matAge = as.factor('X'),
+                                GA_2 = as.factor('X'),
+                                PE = 'X') %>% dplyr::select(-Basename, -filenames, -GRP)
+pDat_RCM$PE[grep('^[EL]OPE', pDat_RCM$Condition, invert = T)] <- 'FALSE'
+pDat_RCM$PE[grep('^[EL]OPE', pDat_RCM$Condition)] <- 'TRUE'
+table(pDat_RCM$PE) #56 TRUE, 411 FALSE
+table(pDat_RCM$Condition)
+
+
+setdiff(names(pDat_RCM), names(pDat_Mic))
+
+length(pDat_RCM) #17 17 17
+length(pDat_Fry)
+length(pDat_Mic)
+
+rownames(pDat_Fry) <- pDat_Fry$sampleNames
+rownames(pDat_RCM) <- pDat_RCM$sampleNames
+rownames(pDat_Mic) <- pDat_Mic$sampleNames
+
+# put pDat back in
+pData(mset_RCM) <- DataFrame(pDat_RCM)
+pData(mset_Fry) <- DataFrame(pDat_Fry)
+pData(mset_Mic) <- DataFrame(pDat_Mic)
+
+colnames(mset_RCM) <- rownames(pData(mset_RCM))
+colnames(mset_Fry) <- rownames(pData(mset_Fry))
+colnames(mset_Mic) <- rownames(pData(mset_Mic))
+```
+
+## 4.4 Combine data
+
+First I combine michels and fry data, and then this combined mset with the mset_RCM.
+
+michels + fry ----> mset_FM
+
+mset_FM + mset_RCM ----> mset
+
+```{r combine data}
+annotation(mset_Mic)["array"] == annotation(mset_Fry)["array"] # sanity check
+annotation(mset_RCM)["array"] == annotation(mset_Fry)["array"]
+
+common.features <- intersect(rownames(mset_Mic), rownames(mset_Fry)) # this is important bc the snp probes will be dropped
+
+# Reorder probes, drop any that are not in common (should be none)
+mset_Fry <- mset_Fry[common.features,]
+mset_Mic <- mset_Mic[common.features,]
+identical(rownames(mset_Fry), rownames(mset_Mic)) # are rows the same
+
+all(common.features %in% rownames(mset_RCM)) #TRUE
+all(rownames(mset_RCM) %in% common.features) #TRUE
+
+mset_RCM <- mset_RCM[common.features,] #reorder mset_RCM based on mset_Fry/Michels
+mset_Fry
+mset_Mic
+```
+
+combine() doesn't seem to work for some reason. My solution is to extract the data matrixes from the msets, and manually merge those, and then finally combining those into an mset.
+
+## 4.5 Extract data matrices: Meth, Unmeth, pData
+
+```{r get data matrices}
+# get data matrices
+M_fry <- as.data.frame(getMeth(mset_Fry))
+U_fry <- as.data.frame(getUnmeth(mset_Fry))
+pDat_Fry <- pData(mset_Fry)
+
+M_mic <- as.data.frame(getMeth(mset_Mic))
+U_mic <- as.data.frame(getUnmeth(mset_Mic))
+pDat_Mic <- pData(mset_Mic)
+
+M_RCM <- as.data.frame(getMeth(mset_RCM))
+U_RCM <- as.data.frame(getUnmeth(mset_RCM))
+pDat_RCM <- pData(mset_RCM)
+```
+
+Need to make sure that everything is in consistent ordering
+
+```{r sanity check}
+# Are probes in the right order / the same?
+identical(rownames(M_fry), rownames(M_mic))
+identical(rownames(U_fry), rownames(U_mic))
+identical(rownames(U_fry), rownames(M_mic))
+
+# are sample IDs consistent?
+identical(colnames(M_fry), colnames(U_fry))
+identical(colnames(M_fry), rownames(pDat_Fry))
+identical(colnames(M_mic), colnames(U_mic))
+identical(colnames(M_mic), rownames(pDat_Mic))
+```
+
+If everything is TRUE, then proceed with merging.
+
+## 4.6 Merge data matrices
+
+Here I merge the individual meth, unmeth, and pdatas from both of the objects.
+
+```{r merge data matrices}
+# add cpg names to M and U matrices to merge with dplyr
+M_fry$cpg <- rownames(M_fry)
+U_fry$cpg <- rownames(U_fry)
+
+M_mic$cpg <- rownames(M_mic)
+U_mic$cpg <- rownames(U_mic)
+
+Meth <- inner_join(M_mic, M_fry, by = 'cpg') # will exclude rows that are not present in both (should be 0)
+Unmeth <- inner_join(U_mic, U_fry, by = 'cpg')
+
+rownames(Meth) <- Meth$cpg
+rownames(Unmeth) <- Unmeth$cpg
+
+Meth <- Meth %>% dplyr::select(-cpg)
+Unmeth <- Unmeth %>% dplyr::select(-cpg)
+
+dim(Meth)
+dim(Unmeth)
+
+class(Meth)
+class(Unmeth)
+
+# merge pData
+pDat_Fry
+pDat_Mic
+
+pDat <- rbind(as.data.frame(pDat_Mic), as.data.frame(pDat_Fry))
+
+# Check if samples are in the same order as the columns of the data matrices
+identical(rownames(pDat), colnames(Meth))
+identical(rownames(pDat), colnames(Unmeth))
+```
+
+## 4.7 Construct mset 
+
+Now that I have the final combined meth, unmeth, and pdata matrices, I can manually construct a methylset object
+```{r construct mset}
+preprocessing <- mset_Fry@preprocessMethod
+
+mset_FM <- MethylSet(as.matrix(Meth), as.matrix(Unmeth), 
+                  annotation = c(array="IlluminaHumanMethylation450k",annotation="ilmn12.hg19"),
+                  preprocessMethod = preprocessing)
+pData(mset_FM) <- DataFrame(pDat)
+mset_FM # 485577 118 
+identical(colnames(mset_FM), rownames(pData(mset_FM))) # sanity check samples are in the right order
+```
+
+Now i repeat the above steps for combining the combined msets.
+
+I write this as a function instead so I don't have to do this again.
+
+```{r}
+combineMset <- function(msetA, msetB) {
+  if(nrow(msetA) != nrow(msetB)){
+    stop('num of cpgs do not match')
+  }
+  
+  pDatA <- pData(msetA)
+  pDatB <- pData(msetB)
+  
+  if((length(setdiff(names(pDatA), names(pDatB))) != 0 )|
+     (length(setdiff(names(pDatB), names(pDatA))) != 0 ) ){
+    stop('pDat column names do not match')
+  }
+  
+  order <- intersect(rownames(msetA), rownames(msetB)) 
+
+  # Reorder probes, drop any that are not in common (should be none)
+  msetA <- msetA[order,]
+  msetB <- msetB[order,]
+  
+  # get meth/unmeth matrices
+  m_A <- getMeth(msetA)
+  u_A <- getUnmeth(msetA)
+  
+  m_B <- getMeth(msetB)
+  u_B <- getUnmeth(msetB)
+  
+  # concatenate meth and unmeth matrices
+  m <- cbind(m_A, m_B)
+  u <- cbind(u_A, u_B)
+  
+  # merge pDats
+  pDat <- rbind(as.data.frame(pDatA), as.data.frame(pDatB))
+  
+  mset <- MethylSet(as.matrix(m), as.matrix(u), 
+                  annotation = c(array="IlluminaHumanMethylation450k",annotation="ilmn12.hg19"),
+                  preprocessMethod = c(rg.norm='Raw (no normalization or bg correction)',
+                                       minfi='1.24.0', manifest='0.4.0'))
+  pData(mset) <- DataFrame(pDat)
+  
+  return(mset)
+}
+
+mset <- combineMset(mset_FM, mset_RCM)
+mset
+```
+
+```{r save combined mset, eval = FALSE}
+saveRDS(mset, '../../Robjects_final/00_mset_RCMFM_raw.rds')
+
+```
+
+## 4.8 Filter ethnicity
+
+Here I remove those samples that are not Asian, Caucasian or African. I start with cleaning the data, making sure the labels are consistent.
+
+```{r clean_ethn_Dat}
+pDat <- as.data.frame(pData(mset))
+table(pDat$Ethnicity)
+pDat$Ethnicity <- gsub('White', 'Caucasian',
+                       gsub('Indian', 'South Asian', 
+                            gsub('.*Indian', 'South_Asian',
+                                 gsub('Black', 'African',
+                                      pDat$Ethnicity))))
+table(pDat$Ethnicity)
+sum(is.na(pDat$Ethnicity)) # change these to 'Unknown'
+pDat$Ethnicity[is.na(pDat$Ethnicity)] <- 'Unknown'
+
+# Filter out irrelevant ethnicities
+dim(pDat) #585 17
+ind <- grep('African|Asian|East_Asian|South_Asian|Caucasian', pDat$Ethnicity)
+pDat <- pDat[ind,]
+dim(pDat) #518 17
+mset <- mset[,ind]
+
+pData(mset) <- DataFrame(pDat)
+mset # 485577 518
+```
+
+Save ethnicity object
+
+```{r save_eth_mset, eval = FALSE}
+saveRDS(mset, '../../Robjects_final/00_mset_RCMFM_raw_eth.rds')
+```

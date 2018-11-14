@@ -1,0 +1,112 @@
+---
+title: "05_Deploy_classifier"
+author: "Victor Yuan"
+date: "November 14, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+This script is for extracting the final model and saving it for publication
+
+```{r}
+library(dplyr)
+library(impute)
+library(caret)
+library(glmnet)
+
+# Load model and data
+GLM_cv <- readRDS('../../Robjects_final/02_GLM_cv_logloss.rds')
+betas <- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
+dim(betas) #  319625    510
+pDat <- readRDS('../../Robjects_final/01_pDat.rds')
+dim(pDat) # 510 22
+
+# knn impute
+sum(is.na(betas))
+set.seed(1)
+betas <- impute.knn(as.matrix(betas), maxp = 15000)$data
+
+#subset out south asians
+betas_SA <- betas[,which(pDat$Ethnicity == 'South_Asian')]
+pDat_SA <- pDat[which(pDat$Ethnicity == 'South_Asian'),]
+dim(betas_SA);dim(pDat_SA) # 7 samples
+
+glm_fit <- GLM_cv$finalModel
+features <- glm_fit$beta$African@Dimnames[[1]]
+
+# obtain predictions
+preds <- as.data.frame(predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'class'))
+probs <- as.data.frame(predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'response'))
+
+#combine
+pred_prob <- cbind(preds, probs)
+colnames(pred_prob) <- c('Predicted_ethnicity_nothresh', paste0('Prob_', glm_fit$classnames))
+
+# calculate highest probability
+pred_prob$Highest_Prob <- apply(pred_prob[,2:4], 1, max)
+
+# call ambiguous if below threshold
+pred_prob$Predicted_ethnicity <- ifelse(pred_prob$Highest_Prob < 0.75, 'Ambiguous', 
+                                        as.character(pred_prob$Predicted_ethnicity_nothresh))
+pred_prob$Sample_ID <- rownames(pred_prob)
+pred_prob <- pred_prob[,c(7,1,6, 2:5)]
+```
+
+Now I wrap the above code into a function:
+
+```{r}
+pl_infer_ethnicity <- function(betas, threshold = 0.75){ # betas need to be in the form of samples in columns
+  if(!all(features %in% rownames(betas))) {
+    stop('Rownames of betas df must include all 319625 features used to fit classifier.')
+  }
+  
+  betas <- t(betas[features,])
+  
+  # obtain predictions
+  preds <- as.data.frame(predict(glm_fit, betas, s = glm_fit$lambdaOpt, type = 'class'))
+  probs <- as.data.frame(predict(glm_fit, betas, s = glm_fit$lambdaOpt, type = 'response'))
+  p <- cbind(preds, probs)
+  colnames(p) <- c('Predicted_ethnicity_nothresh', paste0('Prob_', glm_fit$classnames))
+
+  p$Highest_Prob <- apply(p[,2:4], 1, max)
+  
+  p$Predicted_ethnicity <- ifelse(p$Highest_Prob < threshold, 'Ambiguous', 
+                                        as.character(p$Predicted_ethnicity_nothresh))
+  p$Sample_ID <- rownames(p)
+  p <- p[,c(7,1,6, 2:5)]
+  
+  return(p)
+}
+
+pl_infer_ethnicity(betas_SA, threshold = 0.75)
+```
+
+saveRDS(glm_fit, '../../Robjects_final/05_glm_fit.rds')
+
+For amy:
+
+```{r}
+# add predictions to pDat
+pDat_SA <- pDat_SA %>% left_join(pred_prob, by = c('sampleNames' = 'Sample_ID'))
+
+# combine with other samples pDat
+pDat_final <- readRDS('../../Robjects_final/03_final_pData.rds')
+pDat_save <- pDat_final %>% 
+  bind_rows(pDat_SA %>% select(-matAge, -CH, -GA_2) %>% mutate(GA = as.numeric(GA)) %>%
+              rename(Self_reported_ethnicity = Ethnicity, Cohort_owner = Dataset))
+dim(pDat_save) # 506 33
+
+# recall ambiguous samples based on 0.75 threshold
+pDat_save$Predicted_ethnicity <- ifelse(pDat_save$Highest_Prob < 0.75, 'Ambiguous', 
+                                        as.character(pDat_save$Predicted_ethnicity))
+table(pDat_save$Predicted_ethnicity)
+saveRDS(pDat_save, '../../Robjects_final/05_pDat_506samps.rds')
+
+ggplot(pDat_save, aes(x = Prob_Caucasian, y = Prob_African, col = Predicted_ethnicity)) +
+  geom_point()
+
+ggplot(pDat_save, aes(x = Prob_Caucasian, y = Prob_African, col = Self_reported_ethnicity)) +
+  geom_point()
+```
+
