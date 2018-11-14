@@ -227,7 +227,15 @@ div.tocify {
 </div>
 
 
-<p>This script is for extracting the final model and saving it for publication</p>
+<p>This script is for extracting the final model and saving it for publication. To make this tool more user-friendly, I create a function that wraps the prediction to output the following variables:</p>
+<ul>
+<li>Probabilities that a sample belongs to a specific class (1 for each ethnicity)</li>
+<li>A class label determined by the highest class-specific probability</li>
+<li>A class label determined after applying a user-supplied threshold function for ‘ambiguous’ samples</li>
+<li>The highest class-specific probability, used to determine the threshold</li>
+</ul>
+<div id="libraries-and-data" class="section level1">
+<h1>Libraries and data</h1>
 <pre class="r"><code>library(dplyr)</code></pre>
 <pre><code>## Warning: package 'dplyr' was built under R version 3.5.1</code></pre>
 <pre><code>## 
@@ -247,6 +255,8 @@ library(caret)</code></pre>
 <pre><code>## Loading required package: Matrix</code></pre>
 <pre><code>## Loading required package: foreach</code></pre>
 <pre><code>## Loaded glmnet 2.0-16</code></pre>
+<pre class="r"><code>library(broom)</code></pre>
+<pre><code>## Warning: package 'broom' was built under R version 3.5.1</code></pre>
 <pre class="r"><code># Load model and data
 GLM_cv &lt;- readRDS('../../Robjects_final/02_GLM_cv_logloss.rds')
 betas &lt;- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
@@ -372,9 +382,12 @@ dim(betas_SA);dim(pDat_SA) # 7 samples</code></pre>
 <pre><code>## [1] 319625      7</code></pre>
 <pre><code>## [1]  7 22</code></pre>
 <pre class="r"><code>glm_fit &lt;- GLM_cv$finalModel
-features &lt;- glm_fit$beta$African@Dimnames[[1]]
-
-# obtain predictions
+features &lt;- glm_fit$beta$African@Dimnames[[1]]</code></pre>
+<p>Here I manually create the outputs mentioned above. Later I implement a function that automatically does this.</p>
+</div>
+<div id="infer-ethnicity" class="section level1">
+<h1>Infer ethnicity</h1>
+<pre class="r"><code># obtain predictions
 preds &lt;- as.data.frame(predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'class'))
 probs &lt;- as.data.frame(predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'response'))
 
@@ -390,6 +403,9 @@ pred_prob$Predicted_ethnicity &lt;- ifelse(pred_prob$Highest_Prob &lt; 0.75, 'Am
                                         as.character(pred_prob$Predicted_ethnicity_nothresh))
 pred_prob$Sample_ID &lt;- rownames(pred_prob)
 pred_prob &lt;- pred_prob[,c(7,1,6, 2:5)]</code></pre>
+</div>
+<div id="function-attempt-1" class="section level1">
+<h1>Function: Attempt 1</h1>
 <p>Now I wrap the above code into a function:</p>
 <pre class="r"><code>pl_infer_ethnicity &lt;- function(betas, threshold = 0.75){ # betas need to be in the form of samples in columns
   if(!all(features %in% rownames(betas))) {
@@ -431,8 +447,120 @@ pl_infer_ethnicity(betas_SA, threshold = 0.75)</code></pre>
 ## COX_7646     0.03549401 0.66372451      0.3007815    0.6637245
 ## GSM1947112   0.02761343 0.01941917      0.9529674    0.9529674
 ## GSM1947297   0.82631224 0.01353996      0.1601478    0.8263122</code></pre>
+<p>Unfortunately the above code requires that new samples have all the features used for training (n=319625), when only 1862 are required for the final prediction. Below I extract the coefficients from the final model and see if I can create the same predictions using a cross product with the sample vector.</p>
+</div>
+<div id="function-attempt-2" class="section level1">
+<h1>Function: Attempt 2</h1>
+<pre class="r"><code># extract coefficients
+coef &lt;- coef(glm_fit, glm_fit$lambdaOpt)
+
+# bind feature coefficients for each cpg and intercept
+out &lt;- do.call(&quot;cbind&quot;, lapply(coef, function(x) x[,1])) 
+out &lt;- as.data.frame(out) %&gt;% mutate(feature = rownames(out)) %&gt;% as_tibble()
+out$feature[1] &lt;- 'Intercept'
+
+# should be 1862 + 1 intercept
+out &lt;- out %&gt;% filter(abs(African) &gt; 0 | abs(Asian) &gt; 0 | abs(Caucasian) &gt; 0)
+out %&gt;% arrange(desc(Asian), desc(African), desc(Caucasian))
+
+#filter data to features
+newDat &lt;- betas_SA[out$feature[2:nrow(out)],2]
+
+#cross product, adding 1 for intercept term
+af &lt;- out$African %*% c(1, newDat)
+as &lt;- out$Asian %*% c(1, newDat)
+ca &lt;- out$Caucasian %*% c(1, newDat)
+
+af/sum(af,as,ca)
+as/sum(af,as,ca)
+ca/sum(af,as,ca)</code></pre>
+<p>After taking out the coefficients and trying the cross product, I get values that I can’t make sense of. I think I need to implement a loglink function on this output, but I’m not sure how to do this.</p>
+<p>Instead, I create a workaround, where given a new samples with the final 1862 features, I add on ‘fake’ data of the remaining 319625-1862 features so that the predict() function accepts it.</p>
+</div>
+<div id="function-attempt-3" class="section level1">
+<h1>Function: Attempt 3</h1>
+<pre class="r"><code># create 'new' data of only the necessary features
+pl_features &lt;- predictors(GLM_cv)
+newDat &lt;- betas_SA[pl_features,]
+dim(newDat) #1862 features, 7 samples</code></pre>
+<pre><code>## [1] 1862    7</code></pre>
+<pre class="r"><code>pl_infer_ethnicity &lt;- function(betas, threshold = 0.75) {
+  
+  # find all final predictors in new data
+  present_features &lt;- intersect(rownames(betas), pl_features)
+  print(paste(length(present_features), 'of 1862 predictors present.'))
+  
+  dat &lt;- betas[present_features,]
+  dim(dat)
+  
+  # find missing non-predictors used for training
+  train_features &lt;- glm_fit$beta$African@Dimnames[[1]]
+  missing_features &lt;- setdiff(train_features, present_features)
+  
+  # Create a matrix of zeros for these missing features
+  zeros &lt;- data.frame(
+    matrix(data = 0, nrow = length(missing_features), ncol = ncol(betas), 
+           dimnames = list(missing_features, colnames(betas))))
+  
+  # add back into the data
+  dat_in &lt;- t(rbind(dat, zeros)[train_features,])
+  
+  # run prediction
+  preds &lt;- as.data.frame(predict(glm_fit, dat_in, s = glm_fit$lambdaOpt, type = 'class'))
+  probs &lt;- as.data.frame(predict(glm_fit, dat_in, s = glm_fit$lambdaOpt, type = 'response'))
+  p &lt;- cbind(preds, probs)
+  colnames(p) &lt;- c('Predicted_ethnicity_nothresh', paste0('Prob_', glm_fit$classnames))
+  p$Highest_Prob &lt;- apply(p[,2:4], 1, max)
+  p$Predicted_ethnicity &lt;- ifelse(p$Highest_Prob &lt; threshold, 'Ambiguous', 
+                                        as.character(p$Predicted_ethnicity_nothresh))
+  p$Sample_ID &lt;- rownames(p)
+  p &lt;- p[,c(7,1,6, 2:5)]
+  
+  return(p)
+}
+
+#now compare:
+pl_infer_ethnicity(newDat)</code></pre>
+<pre><code>## [1] &quot;1862 of 1862 predictors present.&quot;</code></pre>
+<pre><code>##             Sample_ID Predicted_ethnicity_nothresh Predicted_ethnicity
+## PM263           PM263                    Caucasian           Caucasian
+## PM272           PM272                    Caucasian           Ambiguous
+## PM29             PM29                    Caucasian           Ambiguous
+## COX_6987     COX_6987                    Caucasian           Caucasian
+## COX_7646     COX_7646                        Asian           Ambiguous
+## GSM1947112 GSM1947112                    Caucasian           Caucasian
+## GSM1947297 GSM1947297                      African             African
+##            Prob_African Prob_Asian Prob_Caucasian Highest_Prob
+## PM263        0.01433442 0.09107262      0.8945930    0.8945930
+## PM272        0.03455324 0.23050156      0.7349452    0.7349452
+## PM29         0.01881591 0.26736345      0.7138206    0.7138206
+## COX_6987     0.01740569 0.09146101      0.8911333    0.8911333
+## COX_7646     0.03549401 0.66372451      0.3007815    0.6637245
+## GSM1947112   0.02761343 0.01941917      0.9529674    0.9529674
+## GSM1947297   0.82631224 0.01353996      0.1601478    0.8263122</code></pre>
+<pre class="r"><code>pred_prob</code></pre>
+<pre><code>##             Sample_ID Predicted_ethnicity_nothresh Predicted_ethnicity
+## PM263           PM263                    Caucasian           Caucasian
+## PM272           PM272                    Caucasian           Ambiguous
+## PM29             PM29                    Caucasian           Ambiguous
+## COX_6987     COX_6987                    Caucasian           Caucasian
+## COX_7646     COX_7646                        Asian           Ambiguous
+## GSM1947112 GSM1947112                    Caucasian           Caucasian
+## GSM1947297 GSM1947297                      African             African
+##            Prob_African Prob_Asian Prob_Caucasian Highest_Prob
+## PM263        0.01433442 0.09107262      0.8945930    0.8945930
+## PM272        0.03455324 0.23050156      0.7349452    0.7349452
+## PM29         0.01881591 0.26736345      0.7138206    0.7138206
+## COX_6987     0.01740569 0.09146101      0.8911333    0.8911333
+## COX_7646     0.03549401 0.66372451      0.3007815    0.6637245
+## GSM1947112   0.02761343 0.01941917      0.9529674    0.9529674
+## GSM1947297   0.82631224 0.01353996      0.1601478    0.8263122</code></pre>
+<p>yay</p>
+</div>
+<div id="save-data" class="section level1">
+<h1>Save data</h1>
 <p>saveRDS(glm_fit, ‘../../Robjects_final/05_glm_fit.rds’)</p>
-<p>For amy:</p>
+<p>For south asian samples amy is using:</p>
 <pre class="r"><code># add predictions to pDat
 pDat_SA &lt;- pDat_SA %&gt;% left_join(pred_prob, by = c('sampleNames' = 'Sample_ID'))
 
@@ -462,6 +590,7 @@ ggplot(pDat_save, aes(x = Prob_Caucasian, y = Prob_African, col = Predicted_ethn
 <pre class="r"><code>ggplot(pDat_save, aes(x = Prob_Caucasian, y = Prob_African, col = Self_reported_ethnicity)) +
   geom_point()</code></pre>
 <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAA/FBMVEUAAAAAADoAAGYAOmYAOpAAZrYAv8QzMzM6AAA6ADo6AGY6OmY6OpA6kJA6kNtNTU1NTW5NTY5NbqtNjshmAABmADpmAGZmOgBmOpBmZgBmZmZmkJBmtrZmtv9uTU1uTW5uTY5ubqtuq+R8rgCOTU2OTW6OTY6OyP+QOgCQOjqQOmaQZgCQkDqQkGaQtpCQ27aQ2/+rbk2rbm6rbo6ryKur5P+2ZgC2Zma225C22/+2/7a2/9u2///HfP/Ijk3I///bkDrb/7bb///kq27k///r6+vy8vL4dm3/tmb/trb/yI7/25D/27b/29v/5Kv//7b//8j//9v//+T///8hBfC3AAAACXBIWXMAAA7DAAAOwwHHb6hkAAAd40lEQVR4nO2dC3vcNnaGR641cdxU49hOtjdtEo0TedtNVk5Watpa0tSXSrVaSRb//38pwfsFIEHOwRkA5/uexyYH5EdycF7hNgS5SCDIYy12fQEQNCQACnktAAp5LQAKeS0ACnktAAp5rdmAfuxLlzasyQ4YZhoomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYNQjo7feX2fL+1er5h2qRiyIjAwluDAbHGLnTEKCfVl9ngD68OU7evygXhTT5cnV1tYOsh8HG4JojZxoA9OLZX/MS9P6nS1WYFotiaz8Prq4mExpGcGMwMKDkRjZV/O0PH5L7H0+LRZrwRar+3hmgTi4SkisbQD89z8gsFsW2/h/p1fQiNIzSJwaDc5BcaVYJqtTPAwDqscE5SK5kA6hlG3QGoWEENwaDc5BcyQbQhzdHeS/+aLQXP5HQMIIbg8ExRu40Cqj6ZzkOejWZ0DCCG4PBPUmORPlL0tVkQsMIbgwGSmZYRfpTJwD11kDJDKucAGrNaBjBjcFAyQyrXAFqR2gYwY3BQMkMqwCoDAMlM6yivd1uKqFhBDcGAyUzrCK+H3QioWEENwYDJTOsor5hOUcTgPpmoGSGVcTjoADUUwMlM6wiBLRZt1sSGkZwYzBQMsMqN4DatkLDCG4MBkpmWOUCUPtuUhjBjcFAyQyrnPwWD0C9M1Aywyp346Bog/pkoGSGVS4AtZ/fGUZwYzBQMsMqFwP1vFkPg42BkhlWORiobycOAhtGcGMwUDLDKtePvhkuUsMIbgwGSmZY5QzQgksA6oeBkhlWuQLU7ielMIIbg4GSGVa5BhRtUD8MlMywigNQM6JhBDcGAyUzrGJpgxoJDSO4MRgomWEVSy8egO7cQMkMq5gANRAaRnBjMFAywyq3gI79Lh9GcGMwUDLDKqeA5mgCUA8MlMywyh2grduXHWY9DDYGSmZYRX43U/nB6q67MIIbg4GSGVbRP7ih+GB1X2gYwY3BQMkMqzgB7bMaRnBjMFAywypngPbreE1pGkZwYzBQMsMqZ23Q/hAoAN2hgZIZVjkcZuoCCUB3aKBkhlUux0G7PKINujsDJTOswstkZRgomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYxQOo6eekMIIbg4GSGVaxAGr8wTOM4MZgoGSGVQBUhoGSGVbxAtrlNIzgxmCgZIZVswGdpBTMYpGvQJClWHvx7apewUpQNsBgY6BkhlW7A3TsZmbbrIfBxkDJDKt4x0E7BSgAZTNQMsOq3Q3UA1BOAyUzrNrhL0logzIaKJlh1e5/6pxUjoZBg4cGSmZYtXNAp9X0YdDgoYGSGVYBUBkGSmZYBUBlGCiZYdXOAUUblMVAyQyrdg8oDBwGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZljlBaBZR/78/HxW1sNgY6BkhlU+AJoNhZ6f2xAaBg0eGiiZYRUAlWGgZIZVAFSGgZIZVvkAKNqg7g2UzLBq94Dip04OAyUzrNo5oMYpybZZD4ONgZIZVnkDqN1dTWHQ4KGBkhlWAVAZBkpmWLVzQFuvRZ6T9TDYGCiZYdXuAS2FNqhLAyUzrPIHUBhcGiiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlX+AYr3d7swUDLDKu8AHR6wD4MGDw2UzLAKgMowUDLDKgAqw0DJDKu8AxRtUCcGSmZY5R+gMLgwUDLDKgAqw0DJDKsAqAwDJTOs8hLQ5XI5zTD5DOIMlMywykdAl0sjoWHQ4KGBkhlW7RpQXZ8dgNIbKJlh1Y4B1Y56AlB6AyUzrBoA9P7V6vkHtfJ+pXScLb++LLZSZKQBULRB6Q0MKLmRGdCHNymSL8pPn1JWL44bmyky0gTopKyHwcbgECG3MgN6/9Nlcvt9UWDe/3iaPPx62thMkZGGNui0rIfBxuCWIocyA3r7w4eMy0yqKE2rfFXRp/oiFcfFQZAZUFWpl4Bmy9vvmqUoxV96IKVPDAYGlNzIrgT9lPeWUlXtUIqMHHRoK/8waPDQ4JYih7Jrg14clalsgOq7T2HQ4KHBKUQuNdSLPyp78XnFrorRh99oh5nMmwAoqcE5SK40Og6qCtGipn+/Wj2rOvIUGQlA2QzuSXKkXf/UaRbaoJQGSmZY5S+gMFAaKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlUAVIaBkhlWeQ1o/5bQMGjw0EDJDKt8BlRzU30YNHhooGSGVQBUhoGSGVYBUBkGSmZY5TOgaIPSGSiZYZXXgMJAZqBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVQBUhsEUxs1isdg7qT/ffHmSpjVTxvS//97+fP3orW4fdeCmGp/VavcolQCoDIMhihtF0/XisMnN3ctDw946dcHTAar26e03fJRKAFSGQR/Ez68zFs8ev2uQMoxSVwAUBpeAHtSri0WK1s2XvzxZLPYrcJ7+OU2ttv28WCiW1ef9fKPSQWlO7l4u9n5uAJqn36RHPMjMaVGdn+AwQ7I8TpZ0cKbOutlvXyEAFWIwRPFa4ZWjlJKxefyuU4LePNlvbHuiWN1Pyn/Zxhy0fIe7lwcpozWgjYOmO6dobxStxfLLE7VZtSeKc6qityjSKQCF4pDqJe0XFXNKSw/Qw8Y29SHdmn2+Vqzln6sdsuWmBrRx0KTcuVrWJypWM1afdtsHKEFlGIZCeffy8bvNIq+tu4Cq9ca2nENVzZc75t3+fIdNtqFmrGksd24sy9ZqmZpW770aHoAKMQzGMsVjU/STtIDW2wyAFjv0AG0YLQC9efqfvRoegAoxGMksFtd7req2tUO1Laudn77NPl9nzciiii92KOv+0t04qA7QThWfNkD/qVfDA1AhBkMUz/ZOkqLTk5Z2KVA6QKtt3U5SUaJWO9y93O90ksr0Qx2gjePkY6+bRa+GB6BCDKYwbvJxonxEaO9EW4LW237OR6Cq4SG18WyxX+6gHWZS6ek+GkCbxznLVp70fyIAoDIMc8Pc1LQR/Dkn6NfwbUDViOoiH3IdFUVGBhLcGAwk/LgGdHPQT2sCmo2r2ooiIwMJbgyGaaQUJVXnphFbQPVuC1v9i2utJqCT7hKgyEi6WPWfJEp9hsANk1DxSe0SNFRANc9iJj5D6AZycLjUaoPqbuUziSIjASibgRwcLrWr+EWgnSQAOmZwxY9zRTLMhDboiIGSGVZFAigMIwZDFP9bq7lMuBDGQWUYDFEMC9DPrw/SjrzlYBNFRgYS3BgMhiiGBahC8+wgudaNl/ZEkZGBBDcGgyGK4QG62bccbKLIyECCG4PBEMWwAE3OMjo3KEHjMxiiGBigapLfmeVPqBQZGUhwYzAYohgYoFNEkZGBBDcGgyGKANR91sNgYzBEcQTQu2+yG+qzO5p1N2syqFfF295zR5GRgQQ3BoMhihWTV1dXGkCv//FgZ2QW6naSrO8KpcjIQIIbg8EQxQafDULLrZ//9Je/f6emcfzyt3949HvKqVo/yX7POUxuvvrXxWLKU5zmSXM/KIaZIjQYojgM6M1X786yhymoyULpQt2Pef34v9J6P0uzHTLfSgBUhsEQxWFANymC+xmMaelZLApUvi3T5mFnr1YVv8kfVaKZGdIXRUYGEtwYDIYoDrZB1aRL9eyvGtCv8gLzrEhmB1Q9S6p8mtSYKDJyB7FaLpeOz+CnwRDFwV58xuPZYbcELZ6htBNAJ4giI/ljtVyOERoGb5MNhigOArpRLb7r/RpG1Qa9eap6S2piOwB1YACgbQ0B+vlfsvLym1/q0jLvxW8Wi7/5wyE3oGnBHe6UD2sDAG1rsAT1QsJKULRB2woL0HCnHcMwZjBEMSxAA35wAwwjBkMUwwI0sbsTNBdFRgYS3BgMhiiGBaiATpJYgyt+nEtaJ0mqwRDFgErQbJgJbdBYDYYoAlD3WQ+DjcEQxYAALd8ZgjZolAZDFEMCFMNMMRsMUQwL0FL/hhI0OoMhigECevcSVXyEBkMUgwN0s7CdZ0KRkYEENwaDIYphAZoN1Ncz5u5frZ5/yNber1arry8bCQkADcxgCP8IoNm040I7n3a8yV7LcFYB+vDmOHn/Ilu9OO4kJAA0MIMh/BWT6/VaA2g27Xi3ao6DqkUN6P1Pl8nt95fp2sOvp+0EJYqMDCS4MRgM4W/w2SC03JpNO84mAj3Kb05mnXCcqy5Br7PmZw3o7Q8fkvsfFZpp1b5aHTcSvkjFdH2QUw0Dmk87vvv2rXroYQroHeuE41zt+0GbbdBPz0seb787VaVonaBE8ZceSOkTg8EQ/mFA82nHRUO0aIPyTTjO1enFX9e9+LrAzHRx3E6gyMhAghuDwRD+wTZoMe1YVex7JzmSnBOOc/XGQdOrysdB203OFFC0QQM2GMI/2Isvph2r1bRGV1U864TjXLpfkv7nrWp2PLw5Kjrtqm5/+O2yTlCiyMhAghuDwRD+QUCLacequZkDesM64TiX/n5QBWgx7KnKzPer1bPTBOOgARsM4R8CtJx2fHJW9eJZJxznGgB0WBQZGUhwYzAYojhYgnohACrDYIgiAHWf9TDYGAxRBKDusx4GG4MhigDUfdZPMBhfOUt2Bm8NhigCUPdZb28wv7Sb6gz+GgxRDBVQC1FkJABlM1AywyrNA2yjvWEZgPYUWAka+yPA0QbtKixA8RKFeA2GKAJQ91kPg43BEMWwAM3RtJwdT5GRgQQ3BoMhigEBWj7aDk8WidJgiGJAgE4VRUYGEtwYDIYoAlD3WQ+DjcEQxRFA1bCj1eQjd3fftQHdRP8irwkGm0Gp7c7AaDBEsWJyuVz2Ac2GHc+4psfpJWocdJLBalh/qzNwGgxRbPDZILTYmM+Wy97elU83br0tKU9zPicZw0wmAwCtphaX043r981V7zx2PicZgJoMAPR6v7FnPd249c5j53OSUcUbDeLboOXLjZP2dOPWO4+dz0lGJ0mGwRDFwV581QZtTzduvfNY7ed0TjKGmWQYDFEcHmYqe/HFdGMFbJrUeuex8znJeBWiDIMhisOAVuOg+XRjtfi7b9vvPE5cz0nGM+plGAxRHAHUA+FViDIMhiiGBShehRivwRDFsACdJIqMDCS4MRgMUQSg7rMeBhuDIYpBAXpmWbnnosjIQIIbg8EQxZAAVXetbOwJpcjIQIIbg8EJPByqAM0GQSeMhFJkZCDBjcFgiGJAJWg2CPr5tfVrRygyMpDgxmAwRBGAus96GGwMhigCUPdZD4ONwRBFAOo+62GwMRiiGBSgQqYdL5dLx2fw0WCIYkCAThVFRu4iVtm9407P4KXBEEUA6j7rJxoAaFPDgKpatVedtiZ9FPs5fCkyACU/g5cGQxQrJs/Pz3uAZt2S3h1uGkBdvhRZHKBogzbV4LNBaLEx41CVjmlJWk4tfvof6frvT/+hObXY6UuR5QEq02CI4iCgn18XpefZQTGtoyg+O1OLnb4UGYDKMBiiOAhoVijunWTopdA1AG1P63D6UmQAKsNgiOJgGzRTMQ/u85+MgLp9KfJsQKEYNNiLzx/ccHY4UoK6fSly1CVo2h8Ko3xzbzBEcRDQrBevau68DVrMOu6h5/alyDEDOjaitP0ZwjEYojgIaDYOmtbaRS++mHX8+fWj35voOX4pMgDd5gzhGAxRHAbUBwHQbc4QjsEQxW0AVaOdi7yIdaiYAUUbtJGkF0pQ91kPg43BEEUA6j7rYbAxGKIIQN1nPQw2BkMUAaj7rIfBxkDJDKsAqAwDJTOsAqAyDJTMsAqAyjBQMsMqACrDQMkMqwCoDAMlM6wCoFrDhN9Ivf0O7aRQBUB1hsFf8TubfP0OnaRQBUB1hiFAu9t8/Q6dpFAFQHUGAOqNAKjWMFzDA1A+AdDJBrRBOQVAZRgomWHVbgFdr9dbZz0MNgZKZli1U0DX66mE+k6DzSu8AegUAVBKw9WVBaEAdIoAKKUBgJILbVBKAwAlF3rxpAa0QakFQGUYKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWHVAKD3r1bPP2Rrt39crY6T5P1qtfr6sthKkZGBBDcGg3uSHMkM6MOb4+T9C7V2/+NpcvvdaXJx3NhMkZGBBDcGg2OM3MkM6P1Pl8nt96rA/PQi/e/i+OHX08ZmiowMJLgxGBxj5E5mQG9/+JCVnbnStbTKz2r6JPkiFcfFQZAZ0E/PG4A+vDnKavm6FKX4Sw+k9InB4J4kR7IrQe9fHRWpVTuUIiMDCW4MBrcUOZRNGzTtxVfdIwAapsEtRQ411Is/KnrxBZ+qzn/4DcNMQRqcg+RKo+OgaSGqxj9V9yhdPqs68hQZGUhwYzBwsORE+CVpB4YJL7mZeYZ+UqgCoPyGwZfckJxBkxSqACi/AYBOEADlNwDQCQKgOzCgDWovACrDQMkMqwCoDAMlM6wCoDIMlMywCoDKMFAywyoAKsNAyQyrAKgMAyUzrAKgMgyUzLAKgMowUDLDKgAqw0DJDKsA6C4NNu/9AqDzRJGRnuPj3GD15kQAOk8UGek3Pu4NAHRcAHSHhuVyCUBHBEB3Z7C97Q6AzhFFRnqNj3sDALUQAKU2jEIHQKcIgBIbxqlrtUE5LilLClUAlNjQBFQPIAbqpwiAEhsagBoKUwA6RQCU2tAqQAHotgKg7gwAlEAA1KEBbdDtBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVQBUhoGSGVYBUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlg1G1AI4hBKUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQTw2NGaEAdI5m5/xWDjGG5px6ADpHc3N+O4cYAwAtBEC9NCwBaCEA6qOhxScAnaV5Ob+tQ4ih/VQnADpH83J+W4cQQwVotgCgczQv57d1CDGUgOZLADpH83J+W4cQgwZQy8eFm85AyQyrAKiXhrqGLwC1feGC6QyUzLAKgHptqNqgAHSqtsz5mQ6xBgA6VRQ57ysNuze0aEQbdI5m5vyWjhAM6/V62zNgHLQSAKU2rNcjhALQKQKg1AYASioASm2gAFTTBt3mkj4C0HkZGQJvbWnYc9EGpTdQMsMqADrFoCsdqS/p6urKwRkomWGVREAHi7hdA3p11SMUgM7R5Jy3zMlJhrHaVHuG4UbiLEDHr8P2DAC0o6AB1fDSTaAF1NAGHe0XTTgDAG0rMkB7KcSA6g2UgKIN2pZAQLdogxoMpIC6MVAyw6qgAe2jZgUo/SURtkGtDCM/zAPQxBNA+7Jog251BvfDTIOG5n3Mk85AyQyrYgPUsUFTmbu4pDZ/STNdbQGgFpqX88OO8VvKZADaARCAztGsnB92WNyU2z/F+fn5NMOkS+qqB+iU1mdxqdsDijaohYbzxTJu2wN6fj5M6BRAs4ue1gY19N+136O81C0AzQ48q56hZIZVbgC1HXcxAGoOQa9NQAhoftHTilz9F9X/pdkD2m2Dts6hOXg3AYAmTgBtz2W0MCxDB9RuHkf7JJ2Dp8fsnQ6AJm4A1YfAbFjmhE4/g1ZzANW3ZQxfoNcGtZwJ18zN9bo2qWVGPQDVSJORSZmZ63lt0FKTAJ3cqzLLpg1qd4bBy9oGULXWeqoDADVJn/PrQuO5bsrJjx8ntUF9GZcauJJuGT8CaD8paRagNaEtQMceyUzJDKscAdojVA/troc1rQ0Df3OZYaAs7LWSh9ugmiMlRW/wowbQZdkGbfoAaGIBaCumE6AdlNUQzahhqODVGoZqhW0A1V9bH9CyM7hcquto1fFtGc9AyQyraAFdd6RSyzZpL8KjbQHN5lFAu/E1tBDNhDIAOvi1dYCWVfl5XXR+1PJZOAFoYgno+uPH1ocyBNmyTDPFS0eFr4BOaYMaD5YdQ1Xg3R9T24DmxaieTwBaSReqHp86QJdFLi+bO+jixQ/o2jjMNNYGnSLTF84vS7M1WS6b3fVl3RA1MApAk6mANiJc52RVgBICuk0bNDuh+25YyVf3Wgq6GtuKzUk54FvU8E06tagKAfT+1er5h+ZanZBoAdXxWbRBG+r+qZurT026U3yYAE3WjdH2RmleZkqzgK95azjafOoI1Zw0VJkBfXhznLx/0VirE5T6edAl06RlXsNXddHI7u18tt5zhoEL0CZGPRrHAG2TaKrt+ycNVWZA73+6TG6/v6zX6gSlfsbbAlrm/KzgOjWY26BUZ8gMAHSCzIDe/vAhuf/xtF6rE75I1Tc0+HR2uXEoh6hab6YbklobO4Rq+Kz9wcsM6KfnJY/FWp2gpCkaut0hi8JkSskDQ6aqIK0+oQTtlqBKFDnvPw0hGnR8xgjo5DYoAPXYwAKTCw314o+qXvxR3os/GuzFA1CPDc5BcqXRcVBVZlqOgwJQfw0cLDmRT7M6YXBnoGSGVQBUhoGSGVYBUBkGSmZYBUBlGCiZYRUAlWGgZIZVAFSGgZIZVgFQGQZKZlgFQGUYKJlhFQCVYaBkhlUAVIaBkhlWAVAZBkpmWAVAZRgomWEVAJVhoGSGVbMB1UgzDYRa7k+BM/glAIozeC0AijN4LQCKM3gtSkAhiFwAFPJaABTyWgAU8loAFPJaWwM6/JBGEtVHvP3janWcJO9Xq9XXlyOueWcoDk3+JaoDqhOoL0H+HZLqqRrOArELbQvoyEMaKVQfUT145/a70+TimPL4zTMUhyb/Eu0DqqdcUX+H9KgF8M4CsRNtC+jIA3IoVB/x04tEIfTw6+mIZfYZikOTf4nWAdXfGfl3SC6e/TU/gbNA7ETbAjryiDEKtY+YrqV1V1bTOzhDcWjyL9E6oCrXyL9DUlXxzgKxE20L6MhDGinUOqJ6QJSq5UlLoPoMxaHJv0TzgNmS/DskFaDOArETBVaC3r86KlIp23Cda744dlqCfqq6LsTtUJSgGrG2QdNefBVSyuB2rvni2Gkb9KL8G3MEKNqgTY08pJFC9RELPlUR9PAbYdbXZygOTf4lGgfMK3by75BUgDoLxE5ENA5qekgjiapTNMYQn5HWXfWXKA7taBw0y6a82iX/DjmgTgOxC+GXJMhrAVDIawFQyGsBUMhrAVDIawFQyGsBUMhrxQvo59cLpb2TdvLNlyfdPTea3YakOQTkSjEDeqAWm0dvW8k9uj6/fvxOQXrIdmXQBEUP6N3LNnk9QM8Unymh+QLyTBIAvXn658Wjt6rK31eA/rxYNGBsAnzzJK3sD3KG1X+FpUzPl4fZpmrXX54sUPg6VPSAnj16e/NkX33cz/7dPHn8Ti1LNUrUjNW0SVACqnZTae30J4fpskpKj9ZrRUCEihnQrJOUwpMylSTXiqJrhdRhi8qbpxVd/6fK1XRTCWi5V5Ve7JquVkmdo0HUihnQg2ItA+haVeslZY16vUXXddafLwG9rkrGPD05K2r87HitXdm+lTiJB7RcvfsmrbdTCBslaAlomZ6tLrKqvrsr95eTIzmAqpHO67qBWe1XdN/ThmTG8PVer4ov07MPqtOVstvZlferSZIYQE2dpMY4qGLw5sleWjwepKl7J6WlTM9K1BzcMgmAupYYQJPmMNN+a8+z8pekdGXvL2mVr8aQ/vmbepipTC+aoup4RRIAda14AYWiEACFvJZUQLNfgibeJALtQFIBhQIRAIW8FgCFvBYAhbwWAIW8FgCFvBYAhbzW/wMl6EOQDFZwLgAAAABJRU5ErkJggg==" /><!-- --></p>
+</div>
 
 
 
