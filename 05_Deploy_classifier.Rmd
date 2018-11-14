@@ -2,7 +2,12 @@
 title: "05_Deploy_classifier"
 author: "Victor Yuan"
 date: "November 14, 2018"
-output: html_document
+output:
+  html_document:
+    keep_md: true
+    toc: true
+    toc_float: true
+    toc_depth: 2
 editor_options: 
   chunk_output_type: console
 ---
