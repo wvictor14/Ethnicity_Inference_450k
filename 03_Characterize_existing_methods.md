@@ -76,7 +76,7 @@ dim(betas) #  319625    510
 ```
 
 ```
-## [1] 319625    510
+## [1] 319233    510
 ```
 
 ```r
@@ -85,7 +85,7 @@ dim(pDat) # 499 29
 ```
 
 ```
-## [1] 499  34
+## [1] 499  30
 ```
 
 ```r
@@ -115,7 +115,7 @@ sum(is.na(betas));sum(is.na(betas_all)) #340, 848
 ```
 
 ```
-## [1] 340
+## [1] 339
 ```
 
 ```
@@ -128,111 +128,120 @@ betas <- impute.knn(as.matrix(betas), maxp = 15000)$data
 ```
 
 ```
-## Cluster size 319625 broken into 163356 156269 
-## Cluster size 163356 broken into 106218 57138 
-## Cluster size 106218 broken into 64684 41534 
-## Cluster size 64684 broken into 35473 29211 
-## Cluster size 35473 broken into 32576 2897 
-## Cluster size 32576 broken into 17376 15200 
-## Cluster size 17376 broken into 13853 3523 
-## Done cluster 13853 
-## Done cluster 3523 
-## Done cluster 17376 
-## Cluster size 15200 broken into 9274 5926 
-## Done cluster 9274 
-## Done cluster 5926 
-## Done cluster 15200 
-## Done cluster 32576 
-## Done cluster 2897 
-## Done cluster 35473 
-## Cluster size 29211 broken into 13385 15826 
-## Done cluster 13385 
-## Cluster size 15826 broken into 12305 3521 
-## Done cluster 12305 
-## Done cluster 3521 
-## Done cluster 15826 
-## Done cluster 29211 
-## Done cluster 64684 
-## Cluster size 41534 broken into 21426 20108 
-## Cluster size 21426 broken into 9507 11919 
-## Done cluster 9507 
-## Done cluster 11919 
-## Done cluster 21426 
-## Cluster size 20108 broken into 8321 11787 
-## Done cluster 8321 
-## Done cluster 11787 
-## Done cluster 20108 
-## Done cluster 41534 
-## Done cluster 106218 
-## Cluster size 57138 broken into 28359 28779 
-## Cluster size 28359 broken into 16239 12120 
-## Cluster size 16239 broken into 11002 5237 
-## Done cluster 11002 
-## Done cluster 5237 
-## Done cluster 16239 
-## Done cluster 12120 
-## Done cluster 28359 
-## Cluster size 28779 broken into 15560 13219 
-## Cluster size 15560 broken into 7090 8470 
-## Done cluster 7090 
-## Done cluster 8470 
-## Done cluster 15560 
-## Done cluster 13219 
-## Done cluster 28779 
-## Done cluster 57138 
-## Done cluster 163356 
-## Cluster size 156269 broken into 63395 92874 
-## Cluster size 63395 broken into 32426 30969 
-## Cluster size 32426 broken into 15319 17107 
-## Cluster size 15319 broken into 4468 10851 
-## Done cluster 4468 
-## Done cluster 10851 
-## Done cluster 15319 
-## Cluster size 17107 broken into 10970 6137 
-## Done cluster 10970 
-## Done cluster 6137 
-## Done cluster 17107 
-## Done cluster 32426 
-## Cluster size 30969 broken into 15437 15532 
-## Cluster size 15437 broken into 2943 12494 
-## Done cluster 2943 
-## Done cluster 12494 
-## Done cluster 15437 
-## Cluster size 15532 broken into 6949 8583 
-## Done cluster 6949 
-## Done cluster 8583 
-## Done cluster 15532 
-## Done cluster 30969 
-## Done cluster 63395 
-## Cluster size 92874 broken into 65459 27415 
-## Cluster size 65459 broken into 43091 22368 
-## Cluster size 43091 broken into 17456 25635 
-## Cluster size 17456 broken into 9317 8139 
-## Done cluster 9317 
-## Done cluster 8139 
-## Done cluster 17456 
-## Cluster size 25635 broken into 14548 11087 
-## Done cluster 14548 
-## Done cluster 11087 
-## Done cluster 25635 
-## Done cluster 43091 
-## Cluster size 22368 broken into 21552 816 
-## Cluster size 21552 broken into 9176 12376 
-## Done cluster 9176 
-## Done cluster 12376 
-## Done cluster 21552 
-## Done cluster 816 
-## Done cluster 22368 
-## Done cluster 65459 
-## Cluster size 27415 broken into 12321 15094 
-## Done cluster 12321 
-## Cluster size 15094 broken into 7648 7446 
-## Done cluster 7648 
-## Done cluster 7446 
-## Done cluster 15094 
-## Done cluster 27415 
-## Done cluster 92874 
-## Done cluster 156269
+## Cluster size 319233 broken into 154713 164520 
+## Cluster size 154713 broken into 62742 91971 
+## Cluster size 62742 broken into 30470 32272 
+## Cluster size 30470 broken into 14322 16148 
+## Done cluster 14322 
+## Cluster size 16148 broken into 7658 8490 
+## Done cluster 7658 
+## Done cluster 8490 
+## Done cluster 16148 
+## Done cluster 30470 
+## Cluster size 32272 broken into 16350 15922 
+## Cluster size 16350 broken into 13822 2528 
+## Done cluster 13822 
+## Done cluster 2528 
+## Done cluster 16350 
+## Cluster size 15922 broken into 11649 4273 
+## Done cluster 11649 
+## Done cluster 4273 
+## Done cluster 15922 
+## Done cluster 32272 
+## Done cluster 62742 
+## Cluster size 91971 broken into 63575 28396 
+## Cluster size 63575 broken into 42097 21478 
+## Cluster size 42097 broken into 14224 27873 
+## Done cluster 14224 
+## Cluster size 27873 broken into 15821 12052 
+## Cluster size 15821 broken into 6862 8959 
+## Done cluster 6862 
+## Done cluster 8959 
+## Done cluster 15821 
+## Done cluster 12052 
+## Done cluster 27873 
+## Done cluster 42097 
+## Cluster size 21478 broken into 11733 9745 
+## Done cluster 11733 
+## Done cluster 9745 
+## Done cluster 21478 
+## Done cluster 63575 
+## Cluster size 28396 broken into 16275 12121 
+## Cluster size 16275 broken into 8620 7655 
+## Done cluster 8620 
+## Done cluster 7655 
+## Done cluster 16275 
+## Done cluster 12121 
+## Done cluster 28396 
+## Done cluster 91971 
+## Done cluster 154713 
+## Cluster size 164520 broken into 101365 63155 
+## Cluster size 101365 broken into 38474 62891 
+## Cluster size 38474 broken into 17605 20869 
+## Cluster size 17605 broken into 8674 8931 
+## Done cluster 8674 
+## Done cluster 8931 
+## Done cluster 17605 
+## Cluster size 20869 broken into 4 20865 
+## Done cluster 4 
+## Cluster size 20865 broken into 3144 17721 
+## Done cluster 3144 
+## Cluster size 17721 broken into 17720 1 
+## Cluster size 17720 broken into 8080 9640 
+## Done cluster 8080 
+## Done cluster 9640 
+## Done cluster 17720 
+## Done cluster 1 
+## Done cluster 17721 
+## Done cluster 20865 
+## Done cluster 20869 
+## Done cluster 38474 
+## Cluster size 62891 broken into 29052 33839 
+## Cluster size 29052 broken into 5784 23268 
+## Done cluster 5784 
+## Cluster size 23268 broken into 10541 12727 
+## Done cluster 10541 
+## Done cluster 12727 
+## Done cluster 23268 
+## Done cluster 29052 
+## Cluster size 33839 broken into 31397 2442 
+## Cluster size 31397 broken into 15982 15415 
+## Cluster size 15982 broken into 4240 11742 
+## Done cluster 4240 
+## Done cluster 11742 
+## Done cluster 15982 
+## Cluster size 15415 broken into 6155 9260 
+## Done cluster 6155 
+## Done cluster 9260 
+## Done cluster 15415 
+## Done cluster 31397 
+## Done cluster 2442 
+## Done cluster 33839 
+## Done cluster 62891 
+## Done cluster 101365 
+## Cluster size 63155 broken into 30835 32320 
+## Cluster size 30835 broken into 15213 15622 
+## Cluster size 15213 broken into 8765 6448 
+## Done cluster 8765 
+## Done cluster 6448 
+## Done cluster 15213 
+## Cluster size 15622 broken into 4214 11408 
+## Done cluster 4214 
+## Done cluster 11408 
+## Done cluster 15622 
+## Done cluster 30835 
+## Cluster size 32320 broken into 15344 16976 
+## Cluster size 15344 broken into 8551 6793 
+## Done cluster 8551 
+## Done cluster 6793 
+## Done cluster 15344 
+## Cluster size 16976 broken into 12369 4607 
+## Done cluster 12369 
+## Done cluster 4607 
+## Done cluster 16976 
+## Done cluster 32320 
+## Done cluster 63155 
+## Done cluster 164520
 ```
 
 ```r
@@ -703,13 +712,13 @@ g1 <- ggplot(pcs_cor, aes(x = PC, y = Variable)) +
 # summarize variance explained in ethnicity
 ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
-  scale_colour_manual(values = c('#005824', '#238b45', '#41ae76', '#66c2a4', '#99d8c9'))+
+  scale_color_brewer(palette = 6, type = 'qual') +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 6, w = 3.5
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
 ```
 
 ![](03_Characterize_existing_methods_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
@@ -741,13 +750,13 @@ ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'),
 ## proportion of variance explaind in genetic ancestry
 ggplot(pcs_cor %>% filter(grepl('Coordinate1', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
-  scale_colour_manual(values = c('#8856a7', '#8c96c6'))+
+  scale_colour_manual(values = c('#984ea3', '#ff7f00'))+
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 6, w = 3.5
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
 ```
 
 ![](03_Characterize_existing_methods_files/figure-html/unnamed-chunk-6-5.png)<!-- -->
@@ -755,13 +764,13 @@ ggplot(pcs_cor %>% filter(grepl('Coordinate1', Variable)),
 ```r
 ggplot(pcs_cor %>% filter(grepl('Coordinate2', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
-  scale_colour_manual(values = c('#8856a7', '#8c96c6'))+
+  scale_colour_manual(values = c('#984ea3', '#ff7f00'))+
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 6, w = 3.5
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
 ```
 
 ![](03_Characterize_existing_methods_files/figure-html/unnamed-chunk-6-6.png)<!-- -->
@@ -1023,83 +1032,6 @@ pDat_final <- pDat %>%
 # remove GSE accession and alternate_ID for robinson samples
   mutate(GSE_Accession = ifelse(Cohort_owner == 'Robinson', NA, GSE_Accession),
          Alternate_ID = ifelse(Cohort_owner == 'Robinson', NA, Alternate_ID))
-
-# assign GEO accessions for robinson samples
-robGEO <- read.csv('../../Robinson_samples_in_GEO.csv') %>% as_tibble %>% 
-  dplyr::rename(Alternate_ID = Accession) %>%
-  group_by(sampleNames) %>%
-  mutate(Alternate_ID = paste(Alternate_ID, collapse = ','),
-         GSE_Accession = paste(GSE_Accession, collapse = ',')) %>% ungroup() %>%
-  distinct(sampleNames, .keep_all = T)
-  
-sum(robGEO$sampleNames %in% pDat_final$sampleNames) # 70
-```
-
-```
-## [1] 70
-```
-
-```r
-robGEO %>% filter(!sampleNames %in% pDat_final$sampleNames)
-```
-
-```
-## # A tibble: 7 x 12
-##       X sampleNames Alternate_ID   Title   Platform Series Submission.date
-##   <int> <fct>       <chr>          <fct>   <fct>    <fct>  <fct>          
-## 1    24 PM139       GSM1931535,GS~ genomi~ Link ic~ Link ~ 2015-11-05     
-## 2    30 PM139_r     NA             <NA>    <NA>     <NA>   <NA>           
-## 3    42 PM167_r     NA             <NA>    <NA>     <NA>   <NA>           
-## 4    61 PM263       GSM1931590,GS~ genomi~ Link ic~ Link ~ 2015-11-05     
-## 5    65 PM272       GSM2674441     genomi~ Link ic~ Link ~ 2017-06-19     
-## 6    68 PM29        NA             <NA>    <NA>     <NA>   <NA>           
-## 7    71 PM306_r3    NA             <NA>    <NA>     <NA>   <NA>           
-## # ... with 5 more variables: Approval.status <fct>, Release.status <fct>,
-## #   Release.date <fct>, GSE_Accession <chr>, X.1 <fct>
-```
-
-```r
-# fill in geo accession into final pDat
-pDat_final <- pDat_final %>% 
-  left_join(robGEO %>% select(sampleNames, GSE_Accession, Alternate_ID), by = 'sampleNames') %>%
-  mutate(GSE_Accession = coalesce(GSE_Accession.x, GSE_Accession.y),
-         Alternate_ID = coalesce(Alternate_ID.x, Alternate_ID.y)) %>% 
-  select(-GSE_Accession.x, -GSE_Accession.y, -Alternate_ID.x, -Alternate_ID.y) %>% 
-  select(sampleNames, Alternate_ID, GSE_Accession, Cohort_owner, Cohort_ID:meanSScor) %>% 
-  arrange(Cohort_ID, Self_reported_ethnicity, Predicted_ethnicity, Sex)
-```
-
-```
-## Warning: Column `sampleNames` joining character vector and factor, coercing
-## into character vector
-```
-
-```r
-pDat_final
-```
-
-```
-## # A tibble: 499 x 28
-##    sampleNames Alternate_ID GSE_Accession Cohort_owner Cohort_ID Sex  
-##    <chr>       <chr>        <chr>         <fct>        <chr>     <fct>
-##  1 DeID2       DeID2        GSE70453      Michels      C1        M    
-##  2 DeID23      DeID23       GSE70453      Michels      C1        M    
-##  3 DeID40      DeID40       GSE70453      Michels      C1        M    
-##  4 DeID14      DeID14       GSE70453      Michels      C1        F    
-##  5 DeID15      DeID15       GSE70453      Michels      C1        F    
-##  6 DeID48      DeID48       GSE70453      Michels      C1        F    
-##  7 DeID49      DeID49       GSE70453      Michels      C1        F    
-##  8 DeID56      DeID56       GSE70453      Michels      C1        F    
-##  9 DeID57      DeID57       GSE70453      Michels      C1        F    
-## 10 DeID60      DeID60       GSE70453      Michels      C1        F    
-## # ... with 489 more rows, and 22 more variables:
-## #   Self_reported_ethnicity <fct>, Predicted_ethnicity <chr>,
-## #   Prob_African <dbl>, Prob_Asian <dbl>, Prob_Caucasian <dbl>,
-## #   Highest_Prob <dbl>, AIMs_Coordinate1 <dbl>, AIMs_Coordinate2 <dbl>,
-## #   AIMs_Coordinate3 <dbl>, Condition <chr>, PE <fct>, Plate <fct>,
-## #   GA <dbl>, Row <chr>, Column <chr>, Slide <fct>,
-## #   MaternalEthnicity <chr>, IUGR <fct>, BW <chr>, BW_SD <chr>,
-## #   ndet <dbl>, meanSScor <dbl>
 ```
 
 The only sample I'm not sure about is PM139, I'm using PM139_r2, but it says in the sheet that only

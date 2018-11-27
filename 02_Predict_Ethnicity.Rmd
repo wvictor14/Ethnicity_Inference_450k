@@ -38,6 +38,8 @@ library(ggsci)
 library(dplyr)
 library(impute)
 library(ggridges)
+library(sesame)
+library(readxl)
 source('../sscen.R')
 ```
 
@@ -46,7 +48,7 @@ source('../sscen.R')
 
 ```{r}
 betas <- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
-dim(betas) #  319625    510
+dim(betas) #  319233    510
 pDat <- readRDS('../../Robjects_final/01_pDat.rds')
 dim(pDat) # 510 22
 ```
@@ -112,7 +114,7 @@ pDat <- pDat %>% filter(!sampleNames %in% reps_remove)
 betas <- betas[pDat$sampleNames,]
 betas_all <- betas_all[pDat$sampleNames,]
 
-dim(pDat);dim(betas);dim(betas_all) # [1] 499  23 [1]    499 319625 [1]    499 485577
+dim(pDat);dim(betas);dim(betas_all) # [1] 499  23 [1]    499 319233 [1]    499 485577
 ```
 
 # 2.0 Inner CV
@@ -152,7 +154,7 @@ GLMNET fitted over 48 combinations of alpha and lambda
 
 ```{r train_GLMNET, eval = F}
 # configure parallel processing
-cluster <- makeCluster(ifelse(detectCores() < 33, 12, 24)) # ram is limiting
+cluster <- makeCluster(18) # ram is limiting
 # at peak around 6.5 - 7 gb is used in an instance
 registerDoParallel(cluster)
 
@@ -195,7 +197,7 @@ saveRDS(glm_fit1, '../../Robjects_final/02_innerCV_glm_fit_logloss.rds')
 SVM with a linear kernel over 8 different values of cost.
 
 ```{r train_SVM, eval = F}
-cluster <- makeCluster(16)
+cluster <- makeCluster(14)
 # 16 cores consumes ~90% of hpc01 ram
 # at peak around 11 gb for 1 instance
 registerDoParallel(cluster)
@@ -221,7 +223,7 @@ for (i in 1:length(folds)) {
   svm_fit[[paste0('fold', i)]] <- svm_fit1;rm(svm_fit1)
 }
 )# user   system  elapsed 
-# 1569.36   241.88 16465.64 
+# 3092.52   344.18 27610.45 
 stopCluster(cluster)
 saveRDS(svm_fit, '../../Robjects_final/02_innerCV_svm_fit_logloss.rds')
 ```
@@ -231,7 +233,7 @@ saveRDS(svm_fit, '../../Robjects_final/02_innerCV_svm_fit_logloss.rds')
 KNN from k = 1 to k = 10
 
 ```{r train_KNN, eval = F}
-cluster <- makeCluster(16)
+cluster <- makeCluster(14)
 registerDoParallel(cluster)
 
 # KNN
@@ -294,7 +296,7 @@ for (i in 1:length(folds)) {
   nsc_fit[[paste0('fold', i)]] <- nsc_fit1;rm(nsc_fit1)
 }
 )#111   user  system elapsed (16 cores) 
- #191.77  242.80 5406.84 
+ # 251.94  333.25 8856.84 
 stopCluster(cluster)
 saveRDS(nsc_fit, '../../Robjects_final/02_innerCV_nsc_fit_logLoss.rds')
 ```
@@ -593,11 +595,11 @@ g2 <- ggplot(class_acc, aes(x = Algorithm, y = Accuracy)) +
   theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
   labs(x = '') + facet_wrap(~Ethnicity)
 g2  
-ggbarplot(class_acc, x= 'Algorithm', y = 'Accuracy', color = 'Algorithm', 
-          fill = 'Algorithm', facet.by = 'Ethnicity',
-          palette = 'jco',   position = position_dodge(0.75)) +
-  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 0.5)) +
-  labs(x = '')
+#ggbarplot(class_acc, x= 'Algorithm', y = 'Accuracy', color = 'Algorithm', 
+#          fill = 'Algorithm', facet.by = 'Ethnicity',
+#          palette = 'jco',   position = position_dodge(0.75)) +
+#  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+#  labs(x = '')
 class_acc %>% arrange(Algorithm, Ethnicity, fold)
 ```
 ggsave(g2, filename = '../../Results/11_Class_specific_resampling_performance.tiff')
@@ -631,7 +633,7 @@ res <- tibble(index = c(folds[[1]], folds[[2]], folds[[3]], folds[[4]], folds[[5
 pDat$glm_pred[res$index] <- res$pred
 
 cm <- confusionMatrix(as.factor(pDat$glm_pred), as.factor(pDat$Ethnicity2))
-cm$byClass[1:3, 'Pos Pred Value'] %>% mean() # 0.9151486
+cm$byClass[1:3, 'Pos Pred Value'] %>% mean() # 0.9035936
 cm
 cm_df <- as.data.frame(cm$table) %>% 
   mutate(proportion = if_else(Reference == 'African', Freq/57, if_else(
@@ -809,7 +811,7 @@ cm_df_thresh <- cm3$table %>% as.data.frame() %>%
     Reference=='Caucasian'~ Freq/389
   )) 
 acc <- cm3$overall
-cm3$byClass[1:3, 'Pos Pred Value'] %>% mean() # Pos Pred Value 0.927763
+cm3$byClass[1:3, 'Pos Pred Value'] %>% mean() # Pos Pred Value 0.9436756
 
 ggplot(cm_df_thresh) +
   geom_tile(aes(x = Prediction, y = Reference, fill = proportion)) +
@@ -838,7 +840,7 @@ pDat <- pDat %>% mutate(Cohort = case_when(
     Dataset == 'Fry' ~ 'GSE73375',
     Dataset == 'Robinson' ~ 'GSE100197, GSE108567, GSE74738',
     Dataset == 'Marsit' ~ 'GSE75248' ,
-    Dataset == 'Cox' ~ 'GSE100197'), 
+    Dataset == 'Cox' ~ 'GSE98224'), 
   Cohort = case_when(
     Dataset == 'Michels' ~ 'C1',
     Dataset == 'Fry' ~ 'C2',
@@ -899,6 +901,7 @@ ggplot(cm_by_dataset) +
 ```
 
 write.table(perf_by_dataset, '../../Performance_by_dataset.txt', quote = F, row.names= F)
+write.table(cm_by_dataset, '../../Performance_by_dataset.txt', quote = F, row.names= F)
 
 ## 3.4 missclassifications
 
@@ -946,6 +949,10 @@ ggboxplot(pDat, x = 'Prediction_result', y = 'Prob_correct_con',
           ylab = 'Probability associated with\ncorrect class', 
           xlab = 'Classification Result') +
   theme(legend.position = 'none')
+
+ggplot(pDat, aes(x = Prediction_result, y = Prob_correct_con)) +
+  geom_boxplot() + theme_bw() + geom_jitter() +
+  labs(y = 'Probability associated with\ncorrect class', x = 'Classification Result')
 
 # statistically signficant?
 wilcox.test(pDat %>% filter(Prediction_result == 'Correct') %>% pull(Prob_High_con), 
@@ -1062,7 +1069,7 @@ plot1 <- ggplot(plot_data, aes(x = value, y = variable)) +
   scale_x_continuous(breaks = c(0, 0.5, 1));plot1
 
 # Figure out how many sites fall into each category
-length(glm$features)#1862
+length(glm$features)#1860
 sum(grepl('rs', glm$features))# 15 are rs probes
 
 # load 450k annotations to figure out if any annotated SNPs lie in the probe body
@@ -1082,11 +1089,11 @@ anno <- anno %>% as_tibble() %>%
 # filter out to only those in glm predictor (explicit rs probes excluded)
 anno_glm <- anno %>% filter(CpG %in% glm$features)
 
-# Catherine Do et al 2016 placental mQTLs
-cdo <- as_tibble(read.csv('../../data/C Do et al 2016/placental_mqtls.csv'))
-length(intersect(anno_glm$CpG, cdo$Illumina.probe.ID)) # 79 / 866
+# Catherine Do et al 2018 placental mQTLs
+cdo <- read_xlsx('../../data/C Do et al 2018/journal.pgen.1007785.s018.xlsx')
+length(intersect(anno_glm$CpG, cdo$cpgID)) # 220 / 4342
 anno_glm <- anno_glm %>% 
-  mutate(CDo_2016_pl_mQTLs = ifelse(CpG %in% cdo$Illumina.probe.ID, 1, 0)) 
+  mutate(CDo_2016_pl_mQTLs = ifelse(CpG %in% cdo$cpgID, 1, 0)) 
 
 # ALSPAC birth / cord blood mQTLs
 alspac <- as_tibble(read.table('../../data/ALSPAC mQTLs/cord.ALL.M.tab'), header = TRUE)
@@ -1095,12 +1102,12 @@ alspac <- alspac[-1, ]          # removing the first row.
 #fix variable classes
 alspac2 <- alspac %>% mutate_at(vars(beta:FDR), as.character) %>% mutate_if(is.character, as.numeric)
 alspac3 <- alspac2 %>% filter(`p-value` < 1e-14) %>% pull(gene) %>% as.character
-length(intersect(anno_glm$CpG, alspac3)) #243 / 27992
+length(intersect(anno_glm$CpG, alspac3)) #242 / 27992
 anno_glm <- anno_glm %>% mutate(ALSPAC_mQTL = ifelse(CpG %in% alspac3, 1, 0))
 
 # our pilot study
-roblab <- as_tibble(read.table('../../Results/16_mQTL_results.txt', header = T))
-length(intersect(anno_glm$CpG, roblab$cpg)) # 144 / 2461
+roblab <- read_xlsx('../../Results/16_mQTL_results.xlsx')
+length(intersect(anno_glm$CpG, roblab$cpg)) # 147 / 2461
 anno_glm <- anno_glm %>% mutate(roblab_pilot_mQTL = ifelse(CpG %in% roblab$cpg, 1, 0)) 
 
 # aggregate mQTL (-roblab b/c unpublished) into one column, and snp in probe/cpg/sbe into one
@@ -1121,14 +1128,130 @@ upset(as.data.frame(glm_upset), sets = c('Ethnicity_predictive_cpgs',
       keep.order = T, text.scale = 2)
 
 # number of probes with snp in probe / cpg / sbe position
-sum(anno_glm$SNP_in_probe_CpG_SBE == 1) # 803
+sum(anno_glm$SNP_in_probe_CpG_SBE == 1) # 802
 
 anno_glm_all <- glm[,c(4,1:3)] %>% rename(Importance_African = African, 
                           Importance_Asian = Asian, 
                           Importance_Caucasian = Caucasian) %>%
   full_join(anno_glm %>% select(-ALSPAC_mQTL, -roblab_pilot_mQTL, -mQTL, -SNP_in_probe_CpG_SBE), 
             by = c('features' = 'CpG')) 
+
+# total number of genetic and non-genetic cpgs fed to classifier
+genetic_cpgs1 <- anno %>% filter(CpG %in% colnames(betas)) %>%
+  filter(Probe_maf > 0.01 | CpG_maf > 0.01 | SBE_maf > 0.01) %>%
+  pull(CpG)
+  
+# num of cpgs with snps in probe
+length(genetic_cpgs1) # 64821
+
+# num of cpgs that are placental mqtl
+length(unique(cdo$cpgID)) # 4342
+
+# genetic probes = the union of above (addition minus overlap)
+length(union(genetic_cpgs1, cdo$cpgID)) # 68062
+
+# number of non-genetic probes
+length(colnames(betas)) - length(union(genetic_cpgs1, cdo$cpgID)) # 251171
+
+# test of significance
+# genetic cpgs:
+fisher.test(matrix(c(940,68062,905,251171),nrow=2,ncol=2),alternative="greater")
+
+# rs probes
+fisher.test(matrix(c(15,59,1845,319174),nrow=2,ncol=2),alternative="greater")
+
+# mqtls
+cpgs <- colnames(betas)[!grepl('rs', colnames(betas))]
+length(cpgs) # 319174
+length(intersect(cdo$cpgID, cpgs)) # 3689 num of mqtls fed to classifier
+length(intersect(cdo$cpgID, cpgs))  - 220 # 3469 num mqtls not used by classifier
+length(setdiff(cpgs, cdo$cpgID)) # 315485 num of non-mqtls fed to classifier
+1845-220 # 1625 num of non-mqtls fed to classifier
+
+fisher.test(matrix(c(220,3469,1625,315485),nrow=2,ncol=2),alternative="greater")
+
+# tech genetic cpgs
+fisher.test(matrix(c(802, 64821, 1043, 254353), nrow = 2, ncol=2), alternative="greater")
 ```
 
 write.table(anno_glm_all, '../../Robjects_final/02_glm_features.txt', sep = '\t', quote = F,
             row.names = F) 
+
+# 5.0 compare to zhou's classifier
+
+```{r eval = F}
+# load data
+ss_Rob <- read.metharray.sheet(base = '../../data/Robinson/IDATs', recursive = T)
+ss_Cox <- read.metharray.sheet('../../data/Cox', pattern = 'des')
+idat_Mar <- searchIDATprefixes('../../data/GSE75248 - Marsit/IDATS')
+
+# load idats and predict ethnicity
+sset_R <- lapply(ss_Rob$Basename, readIDATpair)
+robeth <- lapply(sset_R, inferEthnicity)
+robeth <- ss_Rob %>% as_tibble() %>% select(sampleNames, Ethnicity) %>%
+  mutate(Predicted_ethnicity_zhou = unlist(robeth))
+
+sset_C <- lapply(ss_Cox$Basename, readIDATpair)
+coxeth <- lapply(sset_C, inferEthnicity)
+coxeth <- ss_Cox %>% as_tibble() %>% select(ParticipantID, Ethnicity) %>%
+  mutate(Predicted_ethnicity_zhou = unlist(coxeth))
+
+rm(sset_R, sset_C)
+library(stringr)
+sset_M <- lapply(idat_Mar, readIDATpair) # 28 gb
+mareth <- lapply(sset_M, inferEthnicity)
+mareth <- tibble(sampleNames = str_extract(names(unlist(mareth)),'GSM[0-9]*'), 
+       Predicted_ethnicity_zhou = unlist(mareth))
+
+# add ethnicity info
+mareth <- mareth %>% inner_join(pDat %>% select(sampleNames, Ethnicity))
+zhou_predictions <- rbind(mareth, robeth, coxeth %>% rename(sampleNames = ParticipantID))
+
+# add glm predicted info
+zhou_predictions<- zhou_predictions %>% inner_join(pDat %>% select(sampleNames, glm_pred, Cohort))
+
+# calculate confusion matrix
+zhou_predictions <- zhou_predictions %>%
+  mutate(Ethnicity = ifelse(Ethnicity == 'Black', 'African',
+                            ifelse(Ethnicity == 'East_Asian', 'Asian', Ethnicity)),
+         Predicted_ethnicity_zhou2 = ifelse(Predicted_ethnicity_zhou == 'WHITE', 'Caucasian', 
+                                            ifelse(Predicted_ethnicity_zhou == 'ASIAN', 'Asian',
+                                                   'African')))  
+levels <- c('African', 'Asian', 'Caucasian')
+cm4 <- confusionMatrix(factor(zhou_predictions$Predicted_ethnicity_zhou2, levels = levels), 
+                reference = factor(zhou_predictions$Ethnicity, levels = levels))
+cm5 <- confusionMatrix(factor(zhou_predictions$glm_pred, levels = levels), 
+                reference = factor(zhou_predictions$Ethnicity, levels = levels))
+
+# combine confusion matrix for both predictors
+cm_z <- rbind(cm4$table %>% as.data.frame() %>% mutate(Algorithm = 'Zhou et al. 2018') %>%
+                mutate(Prediction = case_when(
+                  Prediction == 'African' ~ 'BLACK',
+                  Prediction == 'Caucasian' ~ 'WHITE',
+                  Prediction == 'Asian' ~ 'ASIAN')), 
+              cm5$table %>% as.data.frame() %>% mutate(Algorithm = 'GLMNET')) %>%
+  group_by(Algorithm, Reference) %>%
+  mutate(proportion = Freq/sum(Freq)) %>% ungroup() %>%
+  mutate(Prediction = factor(Prediction, levels = c('African', 'Asian', 'Caucasian', 
+                                                    'BLACK', 'ASIAN', 
+                                                    'WHITE')))
+
+#plot
+ggplot(cm_z) +
+  geom_tile(aes(x = Prediction, y = Reference, fill = proportion)) +
+  geom_text(aes(x = Prediction, y = Reference, label = Freq), size = 5) +
+  facet_grid(~Algorithm, scales = 'free') +
+  scale_fill_gradient2(low = "white", high = "orange", limits = c(0,1),
+                       breaks = c(0, 0.5, 1.0), 
+                       guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")) +
+  theme_bw(base_size = 12) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_x_discrete(expand = c(0,0)) + 
+  scale_y_discrete(expand=c(0,0))+
+   labs(fill = 'Samples in\nself-reported\nclass (%)\n', 
+       x = 'Predicted Ethnicity', y = 'Self-reported\nEthnicity') 
+
+#print performance metrics
+cm4 # zhou
+cm5 # placental predictor
+```

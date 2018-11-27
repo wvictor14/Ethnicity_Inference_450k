@@ -287,13 +287,13 @@ g1 <- ggplot(pcs_cor, aes(x = PC, y = Variable)) +
 # summarize variance explained in ethnicity
 ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
-  scale_colour_manual(values = c('#005824', '#238b45', '#41ae76', '#66c2a4', '#99d8c9'))+
+  scale_color_brewer(palette = 6, type = 'qual') +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 6, w = 3.5
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
 ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'), 
        aes(x = PC, y = Rsquared)) +
   geom_boxplot(aes(col = method)) + scale_y_continuous(limits = c(0,1)) +
@@ -312,22 +312,22 @@ ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'),
 ## proportion of variance explaind in genetic ancestry
 ggplot(pcs_cor %>% filter(grepl('Coordinate1', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
-  scale_colour_manual(values = c('#8856a7', '#8c96c6'))+
+  scale_colour_manual(values = c('#984ea3', '#ff7f00'))+
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 6, w = 3.5
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
 ggplot(pcs_cor %>% filter(grepl('Coordinate2', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
-  scale_colour_manual(values = c('#8856a7', '#8c96c6'))+
+  scale_colour_manual(values = c('#984ea3', '#ff7f00'))+
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 6, w = 3.5
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
 ggplot(pcs_cor %>% filter(grepl('Coordinate3', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
   geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
@@ -574,27 +574,6 @@ pDat_final <- pDat %>%
 # remove GSE accession and alternate_ID for robinson samples
   mutate(GSE_Accession = ifelse(Cohort_owner == 'Robinson', NA, GSE_Accession),
          Alternate_ID = ifelse(Cohort_owner == 'Robinson', NA, Alternate_ID))
-
-# assign GEO accessions for robinson samples
-robGEO <- read.csv('../../Robinson_samples_in_GEO.csv') %>% as_tibble %>% 
-  dplyr::rename(Alternate_ID = Accession) %>%
-  group_by(sampleNames) %>%
-  mutate(Alternate_ID = paste(Alternate_ID, collapse = ','),
-         GSE_Accession = paste(GSE_Accession, collapse = ',')) %>% ungroup() %>%
-  distinct(sampleNames, .keep_all = T)
-  
-sum(robGEO$sampleNames %in% pDat_final$sampleNames) # 70
-robGEO %>% filter(!sampleNames %in% pDat_final$sampleNames)
-
-# fill in geo accession into final pDat
-pDat_final <- pDat_final %>% 
-  left_join(robGEO %>% select(sampleNames, GSE_Accession, Alternate_ID), by = 'sampleNames') %>%
-  mutate(GSE_Accession = coalesce(GSE_Accession.x, GSE_Accession.y),
-         Alternate_ID = coalesce(Alternate_ID.x, Alternate_ID.y)) %>% 
-  select(-GSE_Accession.x, -GSE_Accession.y, -Alternate_ID.x, -Alternate_ID.y) %>% 
-  select(sampleNames, Alternate_ID, GSE_Accession, Cohort_owner, Cohort_ID:meanSScor) %>% 
-  arrange(Cohort_ID, Self_reported_ethnicity, Predicted_ethnicity, Sex)
-pDat_final
 ```
 
 The only sample I'm not sure about is PM139, I'm using PM139_r2, but it says in the sheet that only

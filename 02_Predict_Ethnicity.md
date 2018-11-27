@@ -39,6 +39,8 @@ library(ggsci)
 library(dplyr)
 library(impute)
 library(ggridges)
+library(sesame)
+library(readxl)
 source('../sscen.R')
 ```
 
@@ -48,11 +50,11 @@ source('../sscen.R')
 
 ```r
 betas <- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
-dim(betas) #  319625    510
+dim(betas) #  319233    510
 ```
 
 ```
-## [1] 319625    510
+## [1] 319233    510
 ```
 
 ```r
@@ -103,7 +105,7 @@ sum(is.na(betas));sum(is.na(betas_all))
 ```
 
 ```
-## [1] 340
+## [1] 339
 ```
 
 ```
@@ -117,111 +119,120 @@ betas <- impute.knn(as.matrix(betas), maxp = 15000)$data
 ```
 
 ```
-## Cluster size 319625 broken into 163356 156269 
-## Cluster size 163356 broken into 106218 57138 
-## Cluster size 106218 broken into 64684 41534 
-## Cluster size 64684 broken into 35473 29211 
-## Cluster size 35473 broken into 32576 2897 
-## Cluster size 32576 broken into 17376 15200 
-## Cluster size 17376 broken into 13853 3523 
-## Done cluster 13853 
-## Done cluster 3523 
-## Done cluster 17376 
-## Cluster size 15200 broken into 9274 5926 
-## Done cluster 9274 
-## Done cluster 5926 
-## Done cluster 15200 
-## Done cluster 32576 
-## Done cluster 2897 
-## Done cluster 35473 
-## Cluster size 29211 broken into 13385 15826 
-## Done cluster 13385 
-## Cluster size 15826 broken into 12305 3521 
-## Done cluster 12305 
-## Done cluster 3521 
-## Done cluster 15826 
-## Done cluster 29211 
-## Done cluster 64684 
-## Cluster size 41534 broken into 21426 20108 
-## Cluster size 21426 broken into 9507 11919 
-## Done cluster 9507 
-## Done cluster 11919 
-## Done cluster 21426 
-## Cluster size 20108 broken into 8321 11787 
-## Done cluster 8321 
-## Done cluster 11787 
-## Done cluster 20108 
-## Done cluster 41534 
-## Done cluster 106218 
-## Cluster size 57138 broken into 28359 28779 
-## Cluster size 28359 broken into 16239 12120 
-## Cluster size 16239 broken into 11002 5237 
-## Done cluster 11002 
-## Done cluster 5237 
-## Done cluster 16239 
-## Done cluster 12120 
-## Done cluster 28359 
-## Cluster size 28779 broken into 15560 13219 
-## Cluster size 15560 broken into 7090 8470 
-## Done cluster 7090 
-## Done cluster 8470 
-## Done cluster 15560 
-## Done cluster 13219 
-## Done cluster 28779 
-## Done cluster 57138 
-## Done cluster 163356 
-## Cluster size 156269 broken into 63395 92874 
-## Cluster size 63395 broken into 32426 30969 
-## Cluster size 32426 broken into 15319 17107 
-## Cluster size 15319 broken into 4468 10851 
-## Done cluster 4468 
-## Done cluster 10851 
-## Done cluster 15319 
-## Cluster size 17107 broken into 10970 6137 
-## Done cluster 10970 
-## Done cluster 6137 
-## Done cluster 17107 
-## Done cluster 32426 
-## Cluster size 30969 broken into 15437 15532 
-## Cluster size 15437 broken into 2943 12494 
-## Done cluster 2943 
-## Done cluster 12494 
-## Done cluster 15437 
-## Cluster size 15532 broken into 6949 8583 
-## Done cluster 6949 
-## Done cluster 8583 
-## Done cluster 15532 
-## Done cluster 30969 
-## Done cluster 63395 
-## Cluster size 92874 broken into 65459 27415 
-## Cluster size 65459 broken into 43091 22368 
-## Cluster size 43091 broken into 17456 25635 
-## Cluster size 17456 broken into 9317 8139 
-## Done cluster 9317 
-## Done cluster 8139 
-## Done cluster 17456 
-## Cluster size 25635 broken into 14548 11087 
-## Done cluster 14548 
-## Done cluster 11087 
-## Done cluster 25635 
-## Done cluster 43091 
-## Cluster size 22368 broken into 21552 816 
-## Cluster size 21552 broken into 9176 12376 
-## Done cluster 9176 
-## Done cluster 12376 
-## Done cluster 21552 
-## Done cluster 816 
-## Done cluster 22368 
-## Done cluster 65459 
-## Cluster size 27415 broken into 12321 15094 
-## Done cluster 12321 
-## Cluster size 15094 broken into 7648 7446 
-## Done cluster 7648 
-## Done cluster 7446 
-## Done cluster 15094 
-## Done cluster 27415 
-## Done cluster 92874 
-## Done cluster 156269
+## Cluster size 319233 broken into 154713 164520 
+## Cluster size 154713 broken into 62742 91971 
+## Cluster size 62742 broken into 30470 32272 
+## Cluster size 30470 broken into 14322 16148 
+## Done cluster 14322 
+## Cluster size 16148 broken into 7658 8490 
+## Done cluster 7658 
+## Done cluster 8490 
+## Done cluster 16148 
+## Done cluster 30470 
+## Cluster size 32272 broken into 16350 15922 
+## Cluster size 16350 broken into 13822 2528 
+## Done cluster 13822 
+## Done cluster 2528 
+## Done cluster 16350 
+## Cluster size 15922 broken into 11649 4273 
+## Done cluster 11649 
+## Done cluster 4273 
+## Done cluster 15922 
+## Done cluster 32272 
+## Done cluster 62742 
+## Cluster size 91971 broken into 63575 28396 
+## Cluster size 63575 broken into 42097 21478 
+## Cluster size 42097 broken into 14224 27873 
+## Done cluster 14224 
+## Cluster size 27873 broken into 15821 12052 
+## Cluster size 15821 broken into 6862 8959 
+## Done cluster 6862 
+## Done cluster 8959 
+## Done cluster 15821 
+## Done cluster 12052 
+## Done cluster 27873 
+## Done cluster 42097 
+## Cluster size 21478 broken into 11733 9745 
+## Done cluster 11733 
+## Done cluster 9745 
+## Done cluster 21478 
+## Done cluster 63575 
+## Cluster size 28396 broken into 16275 12121 
+## Cluster size 16275 broken into 8620 7655 
+## Done cluster 8620 
+## Done cluster 7655 
+## Done cluster 16275 
+## Done cluster 12121 
+## Done cluster 28396 
+## Done cluster 91971 
+## Done cluster 154713 
+## Cluster size 164520 broken into 101365 63155 
+## Cluster size 101365 broken into 38474 62891 
+## Cluster size 38474 broken into 17605 20869 
+## Cluster size 17605 broken into 8674 8931 
+## Done cluster 8674 
+## Done cluster 8931 
+## Done cluster 17605 
+## Cluster size 20869 broken into 4 20865 
+## Done cluster 4 
+## Cluster size 20865 broken into 3144 17721 
+## Done cluster 3144 
+## Cluster size 17721 broken into 17720 1 
+## Cluster size 17720 broken into 8080 9640 
+## Done cluster 8080 
+## Done cluster 9640 
+## Done cluster 17720 
+## Done cluster 1 
+## Done cluster 17721 
+## Done cluster 20865 
+## Done cluster 20869 
+## Done cluster 38474 
+## Cluster size 62891 broken into 29052 33839 
+## Cluster size 29052 broken into 5784 23268 
+## Done cluster 5784 
+## Cluster size 23268 broken into 10541 12727 
+## Done cluster 10541 
+## Done cluster 12727 
+## Done cluster 23268 
+## Done cluster 29052 
+## Cluster size 33839 broken into 31397 2442 
+## Cluster size 31397 broken into 15982 15415 
+## Cluster size 15982 broken into 4240 11742 
+## Done cluster 4240 
+## Done cluster 11742 
+## Done cluster 15982 
+## Cluster size 15415 broken into 6155 9260 
+## Done cluster 6155 
+## Done cluster 9260 
+## Done cluster 15415 
+## Done cluster 31397 
+## Done cluster 2442 
+## Done cluster 33839 
+## Done cluster 62891 
+## Done cluster 101365 
+## Cluster size 63155 broken into 30835 32320 
+## Cluster size 30835 broken into 15213 15622 
+## Cluster size 15213 broken into 8765 6448 
+## Done cluster 8765 
+## Done cluster 6448 
+## Done cluster 15213 
+## Cluster size 15622 broken into 4214 11408 
+## Done cluster 4214 
+## Done cluster 11408 
+## Done cluster 15622 
+## Done cluster 30835 
+## Cluster size 32320 broken into 15344 16976 
+## Cluster size 15344 broken into 8551 6793 
+## Done cluster 8551 
+## Done cluster 6793 
+## Done cluster 15344 
+## Cluster size 16976 broken into 12369 4607 
+## Done cluster 12369 
+## Done cluster 4607 
+## Done cluster 16976 
+## Done cluster 32320 
+## Done cluster 63155 
+## Done cluster 164520
 ```
 
 ```r
@@ -464,7 +475,7 @@ pDat <- pDat %>% filter(!sampleNames %in% reps_remove)
 betas <- betas[pDat$sampleNames,]
 betas_all <- betas_all[pDat$sampleNames,]
 
-dim(pDat);dim(betas);dim(betas_all) # [1] 499  23 [1]    499 319625 [1]    499 485577
+dim(pDat);dim(betas);dim(betas_all) # [1] 499  23 [1]    499 319233 [1]    499 485577
 ```
 
 ```
@@ -472,7 +483,7 @@ dim(pDat);dim(betas);dim(betas_all) # [1] 499  23 [1]    499 319625 [1]    499 4
 ```
 
 ```
-## [1]    499 319625
+## [1]    499 319233
 ```
 
 ```
@@ -518,7 +529,7 @@ GLMNET fitted over 48 combinations of alpha and lambda
 
 ```r
 # configure parallel processing
-cluster <- makeCluster(ifelse(detectCores() < 33, 12, 24)) # ram is limiting
+cluster <- makeCluster(18) # ram is limiting
 # at peak around 6.5 - 7 gb is used in an instance
 registerDoParallel(cluster)
 
@@ -562,7 +573,7 @@ SVM with a linear kernel over 8 different values of cost.
 
 
 ```r
-cluster <- makeCluster(16)
+cluster <- makeCluster(14)
 # 16 cores consumes ~90% of hpc01 ram
 # at peak around 11 gb for 1 instance
 registerDoParallel(cluster)
@@ -588,7 +599,7 @@ for (i in 1:length(folds)) {
   svm_fit[[paste0('fold', i)]] <- svm_fit1;rm(svm_fit1)
 }
 )# user   system  elapsed 
-# 1569.36   241.88 16465.64 
+# 3092.52   344.18 27610.45 
 stopCluster(cluster)
 saveRDS(svm_fit, '../../Robjects_final/02_innerCV_svm_fit_logloss.rds')
 ```
@@ -599,7 +610,7 @@ KNN from k = 1 to k = 10
 
 
 ```r
-cluster <- makeCluster(16)
+cluster <- makeCluster(14)
 registerDoParallel(cluster)
 
 # KNN
@@ -663,7 +674,7 @@ for (i in 1:length(folds)) {
   nsc_fit[[paste0('fold', i)]] <- nsc_fit1;rm(nsc_fit1)
 }
 )#111   user  system elapsed (16 cores) 
- #191.77  242.80 5406.84 
+ # 251.94  333.25 8856.84 
 stopCluster(cluster)
 saveRDS(nsc_fit, '../../Robjects_final/02_innerCV_nsc_fit_logLoss.rds')
 ```
@@ -762,7 +773,7 @@ print('fold3:');glm_fit1$fold3$bestTune
 
 ```
 ##    alpha lambda
-## 27   0.2   0.01
+## 33  0.25   0.01
 ```
 
 ```r
@@ -845,7 +856,7 @@ bestTune
 ##    <chr>  <dbl> <chr>                       
 ##  1 GLMNET     1 alpha = 0.05, lambda = 0.01 
 ##  2 GLMNET     2 alpha = 0.1, lambda = 0.01  
-##  3 GLMNET     3 alpha = 0.2, lambda = 0.01  
+##  3 GLMNET     3 alpha = 0.25, lambda = 0.01 
 ##  4 GLMNET     4 alpha = 0.05, lambda = 0.01 
 ##  5 GLMNET     5 alpha = 0.025, lambda = 0.05
 ##  6 KNN        1 k = 10                      
@@ -925,7 +936,7 @@ meanK_Algorithm
 ##   <chr>           <dbl>
 ## 1 GLMNET          0.170
 ## 2 KNN             1.82 
-## 3 NSC             0.277
+## 3 NSC           NaN    
 ## 4 SVM             0.231
 ```
 
@@ -974,7 +985,7 @@ wilcox.test(x %>% filter(Algorithm == 'GLMNET') %>% pull(logLoss),
 ## 	Wilcoxon rank sum test with continuity correction
 ## 
 ## data:  x %>% filter(Algorithm == "GLMNET") %>% pull(logLoss) and x %>% filter(Algorithm == "SVM") %>% pull(logLoss)
-## W = 6676, p-value = 1.144e-09
+## W = 6657, p-value = 9.768e-10
 ## alternative hypothesis: true location shift is not equal to 0
 ```
 
@@ -989,7 +1000,7 @@ wilcox.test(x %>% filter(Algorithm == 'NSC') %>% pull(logLoss),
 ## 	Wilcoxon rank sum test with continuity correction
 ## 
 ## data:  x %>% filter(Algorithm == "NSC") %>% pull(logLoss) and x %>% filter(Algorithm == "SVM") %>% pull(logLoss)
-## W = 15835, p-value = 1.044e-09
+## W = 13949, p-value = 1.676e-08
 ## alternative hypothesis: true location shift is not equal to 0
 ```
 
@@ -1004,7 +1015,7 @@ wilcox.test(x %>% filter(Algorithm == 'NSC') %>% pull(logLoss),
 ## 	Wilcoxon rank sum test with continuity correction
 ## 
 ## data:  x %>% filter(Algorithm == "NSC") %>% pull(logLoss) and x %>% filter(Algorithm == "GLMNET") %>% pull(logLoss)
-## W = 19220, p-value < 2.2e-16
+## W = 17018, p-value < 2.2e-16
 ## alternative hypothesis: true location shift is not equal to 0
 ```
 
@@ -1122,16 +1133,11 @@ g2
 ![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
 
 ```r
-ggbarplot(class_acc, x= 'Algorithm', y = 'Accuracy', color = 'Algorithm', 
-          fill = 'Algorithm', facet.by = 'Ethnicity',
-          palette = 'jco',   position = position_dodge(0.75)) +
-  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 0.5)) +
-  labs(x = '')
-```
-
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-6-3.png)<!-- -->
-
-```r
+#ggbarplot(class_acc, x= 'Algorithm', y = 'Accuracy', color = 'Algorithm', 
+#          fill = 'Algorithm', facet.by = 'Ethnicity',
+#          palette = 'jco',   position = position_dodge(0.75)) +
+#  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+#  labs(x = '')
 class_acc %>% arrange(Algorithm, Ethnicity, fold)
 ```
 
@@ -1143,60 +1149,60 @@ class_acc %>% arrange(Algorithm, Ethnicity, fold)
 ## 4     GLMNET fold4 0.829545455   African
 ## 5     GLMNET fold5 0.865909091   African
 ## 6     GLMNET fold1 0.431428571     Asian
-## 7     GLMNET fold2 0.695121951     Asian
-## 8     GLMNET fold3 0.675000000     Asian
+## 7     GLMNET fold2 0.692682927     Asian
+## 8     GLMNET fold3 0.672727273     Asian
 ## 9     GLMNET fold4 0.665384615     Asian
-## 10    GLMNET fold5 0.662500000     Asian
+## 10    GLMNET fold5 0.665000000     Asian
 ## 11    GLMNET fold1 0.997041420 Caucasian
 ## 12    GLMNET fold2 0.998351648 Caucasian
-## 13    GLMNET fold3 0.997727273 Caucasian
+## 13    GLMNET fold3 0.996969697 Caucasian
 ## 14    GLMNET fold4 0.999208443 Caucasian
 ## 15    GLMNET fold5 0.998833819 Caucasian
 ## 16       KNN fold1 0.048214286   African
 ## 17       KNN fold2 0.024000000   African
 ## 18       KNN fold3 0.073529412   African
 ## 19       KNN fold4 0.006818182   African
-## 20       KNN fold5 0.040909091   African
-## 21       KNN fold1 0.037142857     Asian
-## 22       KNN fold2 0.009756098     Asian
-## 23       KNN fold3 0.118181818     Asian
+## 20       KNN fold5 0.036363636   African
+## 21       KNN fold1 0.040000000     Asian
+## 22       KNN fold2 0.007317073     Asian
+## 23       KNN fold3 0.122727273     Asian
 ## 24       KNN fold4 0.067307692     Asian
-## 25       KNN fold5 0.067500000     Asian
+## 25       KNN fold5 0.077500000     Asian
 ## 26       KNN fold1 0.994970414 Caucasian
 ## 27       KNN fold2 0.999175824 Caucasian
-## 28       KNN fold3 0.978787879 Caucasian
-## 29       KNN fold4 0.996569921 Caucasian
+## 28       KNN fold3 0.979545455 Caucasian
+## 29       KNN fold4 0.996306069 Caucasian
 ## 30       KNN fold5 0.996793003 Caucasian
-## 31       NSC fold1 0.962500000   African
+## 31       NSC fold1 0.961290323   African
 ## 32       NSC fold2 0.992000000   African
 ## 33       NSC fold3 0.941176471   African
-## 34       NSC fold4 0.947727273   African
-## 35       NSC fold5 0.959090909   African
+## 34       NSC fold4 0.947506562   African
+## 35       NSC fold5 0.961651917   African
 ## 36       NSC fold1 0.000000000     Asian
 ## 37       NSC fold2 0.380487805     Asian
 ## 38       NSC fold3 0.820454545     Asian
-## 39       NSC fold4 0.498076923     Asian
-## 40       NSC fold5 0.450000000     Asian
-## 41       NSC fold1 0.965384615 Caucasian
+## 39       NSC fold4 0.484513274     Asian
+## 40       NSC fold5 0.459283388     Asian
+## 41       NSC fold1 0.966252220 Caucasian
 ## 42       NSC fold2 0.951923077 Caucasian
 ## 43       NSC fold3 0.961363636 Caucasian
-## 44       NSC fold4 0.950659631 Caucasian
-## 45       NSC fold5 0.952478134 Caucasian
+## 44       NSC fold4 0.950974421 Caucasian
+## 45       NSC fold5 0.950551541 Caucasian
 ## 46       SVM fold1 0.883928571   African
 ## 47       SVM fold2 0.884000000   African
 ## 48       SVM fold3 0.755882353   African
 ## 49       SVM fold4 0.872727273   African
 ## 50       SVM fold5 0.854545455   African
 ## 51       SVM fold1 0.488571429     Asian
-## 52       SVM fold2 0.768292683     Asian
+## 52       SVM fold2 0.770731707     Asian
 ## 53       SVM fold3 0.672727273     Asian
 ## 54       SVM fold4 0.755769231     Asian
-## 55       SVM fold5 0.685000000     Asian
-## 56       SVM fold1 0.979289941 Caucasian
+## 55       SVM fold5 0.687500000     Asian
+## 56       SVM fold1 0.978994083 Caucasian
 ## 57       SVM fold2 0.979120879 Caucasian
 ## 58       SVM fold3 0.946212121 Caucasian
 ## 59       SVM fold4 0.981002639 Caucasian
-## 60       SVM fold5 0.979591837 Caucasian
+## 60       SVM fold5 0.979300292 Caucasian
 ```
 ggsave(g2, filename = '../../Results/11_Class_specific_resampling_performance.tiff')
 
@@ -1230,11 +1236,11 @@ res <- tibble(index = c(folds[[1]], folds[[2]], folds[[3]], folds[[4]], folds[[5
 pDat$glm_pred[res$index] <- res$pred
 
 cm <- confusionMatrix(as.factor(pDat$glm_pred), as.factor(pDat$Ethnicity2))
-cm$byClass[1:3, 'Pos Pred Value'] %>% mean() # 0.9151486
+cm$byClass[1:3, 'Pos Pred Value'] %>% mean() # 0.9035936
 ```
 
 ```
-## [1] 0.9151486
+## [1] 0.9035936
 ```
 
 ```r
@@ -1246,31 +1252,31 @@ cm
 ## 
 ##            Reference
 ## Prediction  African Asian Caucasian
-##   African        52     0         2
+##   African        52     0         4
 ##   Asian           0    36         7
-##   Caucasian       5    17       380
+##   Caucasian       5    17       378
 ## 
 ## Overall Statistics
 ##                                          
-##                Accuracy : 0.9379         
-##                  95% CI : (0.913, 0.9574)
+##                Accuracy : 0.9339         
+##                  95% CI : (0.9084, 0.954)
 ##     No Information Rate : 0.7796         
 ##     P-Value [Acc > NIR] : < 2.2e-16      
 ##                                          
-##                   Kappa : 0.8227         
+##                   Kappa : 0.8127         
 ##  Mcnemar's Test P-Value : NA             
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: African Class: Asian Class: Caucasian
-## Sensitivity                  0.9123      0.67925           0.9769
-## Specificity                  0.9955      0.98430           0.8000
-## Pos Pred Value               0.9630      0.83721           0.9453
-## Neg Pred Value               0.9888      0.96272           0.9072
+## Sensitivity                  0.9123      0.67925           0.9717
+## Specificity                  0.9910      0.98430           0.8000
+## Pos Pred Value               0.9286      0.83721           0.9450
+## Neg Pred Value               0.9887      0.96272           0.8889
 ## Prevalence                   0.1142      0.10621           0.7796
-## Detection Rate               0.1042      0.07214           0.7615
-## Detection Prevalence         0.1082      0.08617           0.8056
-## Balanced Accuracy            0.9539      0.83178           0.8884
+## Detection Rate               0.1042      0.07214           0.7575
+## Detection Prevalence         0.1122      0.08617           0.8016
+## Balanced Accuracy            0.9516      0.83178           0.8859
 ```
 
 ```r
@@ -1421,7 +1427,7 @@ p <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y =
 ```
 
 ```
-## Warning: Removed 54 rows containing missing values (geom_point).
+## Warning: Removed 56 rows containing missing values (geom_point).
 ```
 
 ![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
@@ -1439,7 +1445,7 @@ p2 <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y 
 ```
 
 ```
-## Warning: Removed 54 rows containing missing values (geom_point).
+## Warning: Removed 56 rows containing missing values (geom_point).
 ```
 
 ![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-8-2.png)<!-- -->
@@ -1452,13 +1458,13 @@ thresholds_plot %>% filter(thresholds < 0.625 & thresholds > 0.58)
 ## # A tibble: 9 x 4
 ##   thresholds Metric    Class     value
 ##        <dbl> <chr>     <chr>     <dbl>
-## 1        0.6 Accuracy  African   0.877
+## 1        0.6 Accuracy  African   0.895
 ## 2        0.6 Accuracy  Asian     0.623
 ## 3        0.6 Accuracy  Caucasian 0.967
-## 4        0.6 PPV       African   0.926
+## 4        0.6 PPV       African   0.927
 ## 5        0.6 PPV       Asian     0.717
 ## 6        0.6 PPV       Caucasian 0.982
-## 7        0.6 Ambiguous African   3    
+## 7        0.6 Ambiguous African   2    
 ## 8        0.6 Ambiguous Asian     7    
 ## 9        0.6 Ambiguous Caucasian 6
 ```
@@ -1473,10 +1479,10 @@ thresholds_plot %>% filter(thresholds < 0.005 )
 ##        <dbl> <chr>     <chr>      <dbl>
 ## 1          0 Accuracy  African    0.912
 ## 2          0 Accuracy  Asian      0.679
-## 3          0 Accuracy  Caucasian  0.977
+## 3          0 Accuracy  Caucasian  0.972
 ## 4          0 PPV       African    0.912
 ## 5          0 PPV       Asian      0.679
-## 6          0 PPV       Caucasian  0.977
+## 6          0 PPV       Caucasian  0.972
 ## 7          0 Ambiguous African   NA    
 ## 8          0 Ambiguous Asian     NA    
 ## 9          0 Ambiguous Caucasian NA
@@ -1490,7 +1496,7 @@ likely many samples are truly epigenetic / genetic mixtures between ethnicities.
 
 
 ```r
-## Threshold at 0.6
+## Threshold at 0.75
 pDat <- pDat %>% 
   mutate(Predicted_ethnicity = case_when(
       Highest_Prob > 0.75 ~ as.character(glm_pred),
@@ -1508,11 +1514,11 @@ cm_df_thresh <- cm3$table %>% as.data.frame() %>%
     Reference=='Caucasian'~ Freq/389
   )) 
 acc <- cm3$overall
-cm3$byClass[1:3, 'Pos Pred Value'] %>% mean() # Pos Pred Value 0.927763
+cm3$byClass[1:3, 'Pos Pred Value'] %>% mean() # Pos Pred Value 0.9436756
 ```
 
 ```
-## [1] 0.9438466
+## [1] 0.9436756
 ```
 
 ```r
@@ -1546,7 +1552,7 @@ pDat <- pDat %>% mutate(Cohort = case_when(
     Dataset == 'Fry' ~ 'GSE73375',
     Dataset == 'Robinson' ~ 'GSE100197, GSE108567, GSE74738',
     Dataset == 'Marsit' ~ 'GSE75248' ,
-    Dataset == 'Cox' ~ 'GSE100197'), 
+    Dataset == 'Cox' ~ 'GSE98224'), 
   Cohort = case_when(
     Dataset == 'Michels' ~ 'C1',
     Dataset == 'Fry' ~ 'C2',
@@ -1597,7 +1603,7 @@ perf_by_dataset
 ##   <chr>      <dbl> <dbl>
 ## 1 C1         0.806 0.652
 ## 2 C2         0.917 0.85 
-## 3 C3         0.934 0.735
+## 3 C3         0.927 0.711
 ## 4 C4         0.795 0.610
 ## 5 C5         0.943 0.851
 ```
@@ -1622,6 +1628,7 @@ ggplot(cm_by_dataset) +
 ![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
 
 write.table(perf_by_dataset, '../../Performance_by_dataset.txt', quote = F, row.names= F)
+write.table(cm_by_dataset, '../../Performance_by_dataset.txt', quote = F, row.names= F)
 
 ## 3.4 missclassifications
 
@@ -1680,6 +1687,14 @@ ggboxplot(pDat, x = 'Prediction_result', y = 'Prob_correct_con',
 ![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-2.png)<!-- -->
 
 ```r
+ggplot(pDat, aes(x = Prediction_result, y = Prob_correct_con)) +
+  geom_boxplot() + theme_bw() + geom_jitter() +
+  labs(y = 'Probability associated with\ncorrect class', x = 'Classification Result')
+```
+
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-3.png)<!-- -->
+
+```r
 # statistically signficant?
 wilcox.test(pDat %>% filter(Prediction_result == 'Correct') %>% pull(Prob_High_con), 
             pDat %>% filter(Prediction_result == 'Incorrect') %>% pull(Prob_High_con), 
@@ -1691,7 +1706,7 @@ wilcox.test(pDat %>% filter(Prediction_result == 'Correct') %>% pull(Prob_High_c
 ## 	Wilcoxon rank sum test with continuity correction
 ## 
 ## data:  pDat %>% filter(Prediction_result == "Correct") %>% pull(Prob_High_con) and pDat %>% filter(Prediction_result == "Incorrect") %>% pull(Prob_High_con)
-## W = 12269, p-value = 1.122e-10
+## W = 13195, p-value = 6.076e-12
 ## alternative hypothesis: true location shift is not equal to 0
 ```
 
@@ -1722,7 +1737,7 @@ ggplot(df, aes(x=Coordinate1,y=Coordinate2)) +
   theme_bw(base_size = 12);
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-3.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-4.png)<!-- -->
 
 # 4.0 Final training
 
@@ -1834,11 +1849,11 @@ plot1 <- ggplot(plot_data, aes(x = value, y = variable)) +
 
 ```r
 # Figure out how many sites fall into each category
-length(glm$features)#1862
+length(glm$features)#1860
 ```
 
 ```
-## [1] 1862
+## [1] 1860
 ```
 
 ```r
@@ -1874,18 +1889,31 @@ anno <- anno %>% as_tibble() %>%
 # filter out to only those in glm predictor (explicit rs probes excluded)
 anno_glm <- anno %>% filter(CpG %in% glm$features)
 
-# Catherine Do et al 2016 placental mQTLs
-cdo <- as_tibble(read.csv('../../data/C Do et al 2016/placental_mqtls.csv'))
-length(intersect(anno_glm$CpG, cdo$Illumina.probe.ID)) # 79 / 866
+# Catherine Do et al 2018 placental mQTLs
+cdo <- read_xlsx('../../data/C Do et al 2018/journal.pgen.1007785.s018.xlsx')
 ```
 
 ```
-## [1] 79
+## Warning in read_fun(path = path, sheet_i = sheet, limits = limits, shim =
+## shim, : Expecting numeric in H1585 / R1585C8: got '5.11901415656116e-320'
+```
+
+```
+## Warning in read_fun(path = path, sheet_i = sheet, limits = limits, shim =
+## shim, : Expecting numeric in I1585 / R1585C9: got '2.41092769238639e-314'
+```
+
+```r
+length(intersect(anno_glm$CpG, cdo$cpgID)) # 220 / 4342
+```
+
+```
+## [1] 220
 ```
 
 ```r
 anno_glm <- anno_glm %>% 
-  mutate(CDo_2016_pl_mQTLs = ifelse(CpG %in% cdo$Illumina.probe.ID, 1, 0)) 
+  mutate(CDo_2016_pl_mQTLs = ifelse(CpG %in% cdo$cpgID, 1, 0)) 
 
 # ALSPAC birth / cord blood mQTLs
 alspac <- as_tibble(read.table('../../data/ALSPAC mQTLs/cord.ALL.M.tab'), header = TRUE)
@@ -1894,23 +1922,23 @@ alspac <- alspac[-1, ]          # removing the first row.
 #fix variable classes
 alspac2 <- alspac %>% mutate_at(vars(beta:FDR), as.character) %>% mutate_if(is.character, as.numeric)
 alspac3 <- alspac2 %>% filter(`p-value` < 1e-14) %>% pull(gene) %>% as.character
-length(intersect(anno_glm$CpG, alspac3)) #243 / 27992
+length(intersect(anno_glm$CpG, alspac3)) #242 / 27992
 ```
 
 ```
-## [1] 243
+## [1] 242
 ```
 
 ```r
 anno_glm <- anno_glm %>% mutate(ALSPAC_mQTL = ifelse(CpG %in% alspac3, 1, 0))
 
 # our pilot study
-roblab <- as_tibble(read.table('../../Results/16_mQTL_results.txt', header = T))
-length(intersect(anno_glm$CpG, roblab$cpg)) # 144 / 2461
+roblab <- read_xlsx('../../Results/16_mQTL_results.xlsx')
+length(intersect(anno_glm$CpG, roblab$cpg)) # 147 / 2461
 ```
 
 ```
-## [1] 144
+## [1] 147
 ```
 
 ```r
@@ -1938,11 +1966,11 @@ upset(as.data.frame(glm_upset), sets = c('Ethnicity_predictive_cpgs',
 
 ```r
 # number of probes with snp in probe / cpg / sbe position
-sum(anno_glm$SNP_in_probe_CpG_SBE == 1) # 803
+sum(anno_glm$SNP_in_probe_CpG_SBE == 1) # 802
 ```
 
 ```
-## [1] 803
+## [1] 802
 ```
 
 ```r
@@ -1951,7 +1979,244 @@ anno_glm_all <- glm[,c(4,1:3)] %>% rename(Importance_African = African,
                           Importance_Caucasian = Caucasian) %>%
   full_join(anno_glm %>% select(-ALSPAC_mQTL, -roblab_pilot_mQTL, -mQTL, -SNP_in_probe_CpG_SBE), 
             by = c('features' = 'CpG')) 
+
+# total number of genetic and non-genetic cpgs fed to classifier
+genetic_cpgs1 <- anno %>% filter(CpG %in% colnames(betas)) %>%
+  filter(Probe_maf > 0.01 | CpG_maf > 0.01 | SBE_maf > 0.01) %>%
+  pull(CpG)
+  
+# num of cpgs with snps in probe
+length(genetic_cpgs1) # 64821
+```
+
+```
+## [1] 64821
+```
+
+```r
+# num of cpgs that are placental mqtl
+length(unique(cdo$cpgID)) # 4342
+```
+
+```
+## [1] 4342
+```
+
+```r
+# genetic probes = the union of above (addition minus overlap)
+length(union(genetic_cpgs1, cdo$cpgID)) # 68062
+```
+
+```
+## [1] 68062
+```
+
+```r
+# number of non-genetic probes
+length(colnames(betas)) - length(union(genetic_cpgs1, cdo$cpgID)) # 251171
+```
+
+```
+## [1] 251171
+```
+
+```r
+# test of significance
+# genetic cpgs:
+fisher.test(matrix(c(940,68062,905,251171),nrow=2,ncol=2),alternative="greater")
+```
+
+```
+## 
+## 	Fisher's Exact Test for Count Data
+## 
+## data:  matrix(c(940, 68062, 905, 251171), nrow = 2, ncol = 2)
+## p-value < 2.2e-16
+## alternative hypothesis: true odds ratio is greater than 1
+## 95 percent confidence interval:
+##  3.54528     Inf
+## sample estimates:
+## odds ratio 
+##   3.833129
+```
+
+```r
+# rs probes
+fisher.test(matrix(c(15,59,1845,319174),nrow=2,ncol=2),alternative="greater")
+```
+
+```
+## 
+## 	Fisher's Exact Test for Count Data
+## 
+## data:  matrix(c(15, 59, 1845, 319174), nrow = 2, ncol = 2)
+## p-value < 2.2e-16
+## alternative hypothesis: true odds ratio is greater than 1
+## 95 percent confidence interval:
+##  25.66153      Inf
+## sample estimates:
+## odds ratio 
+##   43.95978
+```
+
+```r
+# mqtls
+cpgs <- colnames(betas)[!grepl('rs', colnames(betas))]
+length(cpgs) # 319174
+```
+
+```
+## [1] 319174
+```
+
+```r
+length(intersect(cdo$cpgID, cpgs)) # 3689 num of mqtls fed to classifier
+```
+
+```
+## [1] 3689
+```
+
+```r
+length(intersect(cdo$cpgID, cpgs))  - 220 # 3469 num mqtls not used by classifier
+```
+
+```
+## [1] 3469
+```
+
+```r
+length(setdiff(cpgs, cdo$cpgID)) # 315485 num of non-mqtls fed to classifier
+```
+
+```
+## [1] 315485
+```
+
+```r
+1845-220 # 1625 num of non-mqtls fed to classifier
+```
+
+```
+## [1] 1625
+```
+
+```r
+fisher.test(matrix(c(220,3469,1625,315485),nrow=2,ncol=2),alternative="greater")
+```
+
+```
+## 
+## 	Fisher's Exact Test for Count Data
+## 
+## data:  matrix(c(220, 3469, 1625, 315485), nrow = 2, ncol = 2)
+## p-value < 2.2e-16
+## alternative hypothesis: true odds ratio is greater than 1
+## 95 percent confidence interval:
+##  10.86042      Inf
+## sample estimates:
+## odds ratio 
+##   12.31318
+```
+
+```r
+# tech genetic cpgs
+fisher.test(matrix(c(802, 64821, 1043, 254353), nrow = 2, ncol=2), alternative="greater")
+```
+
+```
+## 
+## 	Fisher's Exact Test for Count Data
+## 
+## data:  matrix(c(802, 64821, 1043, 254353), nrow = 2, ncol = 2)
+## p-value < 2.2e-16
+## alternative hypothesis: true odds ratio is greater than 1
+## 95 percent confidence interval:
+##  2.788528      Inf
+## sample estimates:
+## odds ratio 
+##   3.017189
 ```
 
 write.table(anno_glm_all, '../../Robjects_final/02_glm_features.txt', sep = '\t', quote = F,
             row.names = F) 
+
+# 5.0 compare to zhou's classifier
+
+
+```r
+# load data
+ss_Rob <- read.metharray.sheet(base = '../../data/Robinson/IDATs', recursive = T)
+ss_Cox <- read.metharray.sheet('../../data/Cox', pattern = 'des')
+idat_Mar <- searchIDATprefixes('../../data/GSE75248 - Marsit/IDATS')
+
+# load idats and predict ethnicity
+sset_R <- lapply(ss_Rob$Basename, readIDATpair)
+robeth <- lapply(sset_R, inferEthnicity)
+robeth <- ss_Rob %>% as_tibble() %>% select(sampleNames, Ethnicity) %>%
+  mutate(Predicted_ethnicity_zhou = unlist(robeth))
+
+sset_C <- lapply(ss_Cox$Basename, readIDATpair)
+coxeth <- lapply(sset_C, inferEthnicity)
+coxeth <- ss_Cox %>% as_tibble() %>% select(ParticipantID, Ethnicity) %>%
+  mutate(Predicted_ethnicity_zhou = unlist(coxeth))
+
+rm(sset_R, sset_C)
+library(stringr)
+sset_M <- lapply(idat_Mar, readIDATpair) # 28 gb
+mareth <- lapply(sset_M, inferEthnicity)
+mareth <- tibble(sampleNames = str_extract(names(unlist(mareth)),'GSM[0-9]*'), 
+       Predicted_ethnicity_zhou = unlist(mareth))
+
+# add ethnicity info
+mareth <- mareth %>% inner_join(pDat %>% select(sampleNames, Ethnicity))
+zhou_predictions <- rbind(mareth, robeth, coxeth %>% rename(sampleNames = ParticipantID))
+
+# add glm predicted info
+zhou_predictions<- zhou_predictions %>% inner_join(pDat %>% select(sampleNames, glm_pred, Cohort))
+
+# calculate confusion matrix
+zhou_predictions <- zhou_predictions %>%
+  mutate(Ethnicity = ifelse(Ethnicity == 'Black', 'African',
+                            ifelse(Ethnicity == 'East_Asian', 'Asian', Ethnicity)),
+         Predicted_ethnicity_zhou2 = ifelse(Predicted_ethnicity_zhou == 'WHITE', 'Caucasian', 
+                                            ifelse(Predicted_ethnicity_zhou == 'ASIAN', 'Asian',
+                                                   'African')))  
+levels <- c('African', 'Asian', 'Caucasian')
+cm4 <- confusionMatrix(factor(zhou_predictions$Predicted_ethnicity_zhou2, levels = levels), 
+                reference = factor(zhou_predictions$Ethnicity, levels = levels))
+cm5 <- confusionMatrix(factor(zhou_predictions$glm_pred, levels = levels), 
+                reference = factor(zhou_predictions$Ethnicity, levels = levels))
+
+# combine confusion matrix for both predictors
+cm_z <- rbind(cm4$table %>% as.data.frame() %>% mutate(Algorithm = 'Zhou et al. 2018') %>%
+                mutate(Prediction = case_when(
+                  Prediction == 'African' ~ 'BLACK',
+                  Prediction == 'Caucasian' ~ 'WHITE',
+                  Prediction == 'Asian' ~ 'ASIAN')), 
+              cm5$table %>% as.data.frame() %>% mutate(Algorithm = 'GLMNET')) %>%
+  group_by(Algorithm, Reference) %>%
+  mutate(proportion = Freq/sum(Freq)) %>% ungroup() %>%
+  mutate(Prediction = factor(Prediction, levels = c('African', 'Asian', 'Caucasian', 
+                                                    'BLACK', 'ASIAN', 
+                                                    'WHITE')))
+
+#plot
+ggplot(cm_z) +
+  geom_tile(aes(x = Prediction, y = Reference, fill = proportion)) +
+  geom_text(aes(x = Prediction, y = Reference, label = Freq), size = 5) +
+  facet_grid(~Algorithm, scales = 'free') +
+  scale_fill_gradient2(low = "white", high = "orange", limits = c(0,1),
+                       breaks = c(0, 0.5, 1.0), 
+                       guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")) +
+  theme_bw(base_size = 12) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_x_discrete(expand = c(0,0)) + 
+  scale_y_discrete(expand=c(0,0))+
+   labs(fill = 'Samples in\nself-reported\nclass (%)\n', 
+       x = 'Predicted Ethnicity', y = 'Self-reported\nEthnicity') 
+
+#print performance metrics
+cm4 # zhou
+cm5 # placental predictor
+```

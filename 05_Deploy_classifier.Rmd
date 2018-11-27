@@ -32,12 +32,12 @@ library(broom)
 # Load model and data
 GLM_cv <- readRDS('../../Robjects_final/02_GLM_cv_logloss.rds')
 betas <- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
-dim(betas) #  319625    510
+dim(betas) #  319233    510
 pDat <- readRDS('../../Robjects_final/01_pDat.rds')
 dim(pDat) # 510 22
 
 # knn impute
-sum(is.na(betas))
+sum(is.na(betas)) # 339
 set.seed(1)
 betas <- impute.knn(as.matrix(betas), maxp = 15000)$data
 
@@ -81,7 +81,7 @@ Now I wrap the above code into a function:
 ```{r}
 pl_infer_ethnicity <- function(betas, threshold = 0.75){ # betas need to be in the form of samples in columns
   if(!all(features %in% rownames(betas))) {
-    stop('Rownames of betas df must include all 319625 features used to fit classifier.')
+    stop('Rownames of betas df must include all 319233 features used to fit classifier.')
   }
   
   betas <- t(betas[features,])
@@ -106,7 +106,7 @@ pl_infer_ethnicity(betas_SA, threshold = 0.75)
 ```
 
 Unfortunately the above code requires that new samples have all the features used for training 
-(n=319625), when only 1862 are required for the final prediction. Below I extract the coefficients
+(n=319233), when only 1860 are required for the final prediction. Below I extract the coefficients
 from the final model and see if I can create the same predictions using a cross product with the 
 sample vector.
 
@@ -141,8 +141,8 @@ ca/sum(af,as,ca)
 After taking out the coefficients and trying the cross product, I get values that I can't make sense
 of. I think I need to implement a loglink function on this output, but I'm not sure how to do this.
 
-Instead, I create a workaround, where given a new samples with the final 1862 features, I add on
-'fake' data of the remaining 319625-1862 features so that the predict() function accepts it.
+Instead, I create a workaround, where given a new samples with the final 1860 features, I add on
+'fake' data of the remaining 319233-1860 features so that the predict() function accepts it.
 
 # Function: Attempt 3
 
@@ -150,13 +150,13 @@ Instead, I create a workaround, where given a new samples with the final 1862 fe
 # create 'new' data of only the necessary features
 pl_features <- predictors(GLM_cv)
 newDat <- betas_SA[pl_features,]
-dim(newDat) #1862 features, 7 samples
+dim(newDat) #1860 features, 7 samples
 
 pl_infer_ethnicity <- function(betas, threshold = 0.75) {
   
   # find all final predictors in new data
   present_features <- intersect(rownames(betas), pl_features)
-  print(paste(length(present_features), 'of 1862 predictors present.'))
+  print(paste(length(present_features), 'of 1860 predictors present.'))
   
   dat <- betas[present_features,]
   dim(dat)
@@ -193,6 +193,69 @@ pred_prob
 ```
 
 yay
+
+# Function: Attempt 4
+
+Because the above workaround requires publishing a 1.1 Gb model fit object, I try again to find a 
+formula for the manual cross-product method.
+
+```{r}
+#args
+object <-glm_fit
+s <- glm_fit$lambdaOpt
+type <- "response"
+exact <- F
+newx <- t(newDat)
+
+a0 <- object$a0 # dunno what this is
+rownames(a0) <- rep("(Intercept)", nrow(a0))
+nbeta <- object$beta
+klam <- dim(a0) # number of lambdas tuned against
+nclass <- klam[[1]] # # of classes
+nlambda <- length(s) # # of supplied lambda
+
+# if !is.null(s)
+lambda <- object$lambda
+lamlist <- lambda.interp(lambda, s)
+for (i in seq(nclass)) {
+  kbeta <- methods::rbind2(a0[i, , drop = FALSE], nbeta[[i]])#was rbind2
+  vnames <- dimnames(kbeta)[[1]]
+  dimnames(kbeta) <- list(NULL, NULL)
+  kbeta <- kbeta[, lamlist$left, drop = FALSE] %*% Diagonal(x=lamlist$frac) +
+    kbeta[, lamlist$right, drop = FALSE] %*% Diagonal(x=1 - lamlist$frac)
+  dimnames(kbeta) <- list(vnames, paste(seq(along = s)))
+  nbeta[[i]] <- kbeta
+}
+
+c <- lapply(nbeta, function(x) nonzeroCoef(x[-1, ,drop = FALSE], bystep = TRUE))
+
+dd <- dim(newx)
+if (inherits(newx, "sparseMatrix"))
+  newx <- as(newx, "dgCMatrix")
+npred <- dd[[1]]
+dn <- list(names(nbeta), dimnames(nbeta[[1]])[[2]], dimnames(newx)[[1]])
+dp <- array(0, c(nclass, nlambda, npred), dimnames = dn)
+for (i in seq(nclass)) {
+  fitk <- cbind2(1, newx) %*% matrix(nbeta[[i]][c("(Intercept)", colnames(newx)),])
+  dp[i, , ] = dp[i, , ] + t(as.matrix(fitk))
+}
+
+  switch(type, response = {
+    pp <- exp(dp)
+    psum <- apply(pp, c(2, 3), sum)
+    aperm(pp/rep(psum, rep(nclass, nlambda * npred)), c(3, 
+        1, 2))
+  }, link <- aperm(dp, c(3, 1, 2)), class = {
+    dpp <- aperm(dp, c(3, 1, 2))
+    apply(dpp, 3, glmnet_softmax)
+  })
+
+predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'class')
+predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'response')
+
+```
+
+This works too!
 
 # Save data
 

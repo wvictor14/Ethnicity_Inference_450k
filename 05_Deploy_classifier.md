@@ -93,11 +93,11 @@ library(broom)
 # Load model and data
 GLM_cv <- readRDS('../../Robjects_final/02_GLM_cv_logloss.rds')
 betas <- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
-dim(betas) #  319625    510
+dim(betas) #  319233    510
 ```
 
 ```
-## [1] 319625    510
+## [1] 319233    510
 ```
 
 ```r
@@ -111,11 +111,11 @@ dim(pDat) # 510 22
 
 ```r
 # knn impute
-sum(is.na(betas))
+sum(is.na(betas)) # 339
 ```
 
 ```
-## [1] 340
+## [1] 339
 ```
 
 ```r
@@ -124,111 +124,120 @@ betas <- impute.knn(as.matrix(betas), maxp = 15000)$data
 ```
 
 ```
-## Cluster size 319625 broken into 163356 156269 
-## Cluster size 163356 broken into 106218 57138 
-## Cluster size 106218 broken into 64684 41534 
-## Cluster size 64684 broken into 35473 29211 
-## Cluster size 35473 broken into 32576 2897 
-## Cluster size 32576 broken into 17376 15200 
-## Cluster size 17376 broken into 13853 3523 
-## Done cluster 13853 
-## Done cluster 3523 
-## Done cluster 17376 
-## Cluster size 15200 broken into 9274 5926 
-## Done cluster 9274 
-## Done cluster 5926 
-## Done cluster 15200 
-## Done cluster 32576 
-## Done cluster 2897 
-## Done cluster 35473 
-## Cluster size 29211 broken into 13385 15826 
-## Done cluster 13385 
-## Cluster size 15826 broken into 12305 3521 
-## Done cluster 12305 
-## Done cluster 3521 
-## Done cluster 15826 
-## Done cluster 29211 
-## Done cluster 64684 
-## Cluster size 41534 broken into 21426 20108 
-## Cluster size 21426 broken into 9507 11919 
-## Done cluster 9507 
-## Done cluster 11919 
-## Done cluster 21426 
-## Cluster size 20108 broken into 8321 11787 
-## Done cluster 8321 
-## Done cluster 11787 
-## Done cluster 20108 
-## Done cluster 41534 
-## Done cluster 106218 
-## Cluster size 57138 broken into 28359 28779 
-## Cluster size 28359 broken into 16239 12120 
-## Cluster size 16239 broken into 11002 5237 
-## Done cluster 11002 
-## Done cluster 5237 
-## Done cluster 16239 
-## Done cluster 12120 
-## Done cluster 28359 
-## Cluster size 28779 broken into 15560 13219 
-## Cluster size 15560 broken into 7090 8470 
-## Done cluster 7090 
-## Done cluster 8470 
-## Done cluster 15560 
-## Done cluster 13219 
-## Done cluster 28779 
-## Done cluster 57138 
-## Done cluster 163356 
-## Cluster size 156269 broken into 63395 92874 
-## Cluster size 63395 broken into 32426 30969 
-## Cluster size 32426 broken into 15319 17107 
-## Cluster size 15319 broken into 4468 10851 
-## Done cluster 4468 
-## Done cluster 10851 
-## Done cluster 15319 
-## Cluster size 17107 broken into 10970 6137 
-## Done cluster 10970 
-## Done cluster 6137 
-## Done cluster 17107 
-## Done cluster 32426 
-## Cluster size 30969 broken into 15437 15532 
-## Cluster size 15437 broken into 2943 12494 
-## Done cluster 2943 
-## Done cluster 12494 
-## Done cluster 15437 
-## Cluster size 15532 broken into 6949 8583 
-## Done cluster 6949 
-## Done cluster 8583 
-## Done cluster 15532 
-## Done cluster 30969 
-## Done cluster 63395 
-## Cluster size 92874 broken into 65459 27415 
-## Cluster size 65459 broken into 43091 22368 
-## Cluster size 43091 broken into 17456 25635 
-## Cluster size 17456 broken into 9317 8139 
-## Done cluster 9317 
-## Done cluster 8139 
-## Done cluster 17456 
-## Cluster size 25635 broken into 14548 11087 
-## Done cluster 14548 
-## Done cluster 11087 
-## Done cluster 25635 
-## Done cluster 43091 
-## Cluster size 22368 broken into 21552 816 
-## Cluster size 21552 broken into 9176 12376 
-## Done cluster 9176 
-## Done cluster 12376 
-## Done cluster 21552 
-## Done cluster 816 
-## Done cluster 22368 
-## Done cluster 65459 
-## Cluster size 27415 broken into 12321 15094 
-## Done cluster 12321 
-## Cluster size 15094 broken into 7648 7446 
-## Done cluster 7648 
-## Done cluster 7446 
-## Done cluster 15094 
-## Done cluster 27415 
-## Done cluster 92874 
-## Done cluster 156269
+## Cluster size 319233 broken into 154713 164520 
+## Cluster size 154713 broken into 62742 91971 
+## Cluster size 62742 broken into 30470 32272 
+## Cluster size 30470 broken into 14322 16148 
+## Done cluster 14322 
+## Cluster size 16148 broken into 7658 8490 
+## Done cluster 7658 
+## Done cluster 8490 
+## Done cluster 16148 
+## Done cluster 30470 
+## Cluster size 32272 broken into 16350 15922 
+## Cluster size 16350 broken into 13822 2528 
+## Done cluster 13822 
+## Done cluster 2528 
+## Done cluster 16350 
+## Cluster size 15922 broken into 11649 4273 
+## Done cluster 11649 
+## Done cluster 4273 
+## Done cluster 15922 
+## Done cluster 32272 
+## Done cluster 62742 
+## Cluster size 91971 broken into 63575 28396 
+## Cluster size 63575 broken into 42097 21478 
+## Cluster size 42097 broken into 14224 27873 
+## Done cluster 14224 
+## Cluster size 27873 broken into 15821 12052 
+## Cluster size 15821 broken into 6862 8959 
+## Done cluster 6862 
+## Done cluster 8959 
+## Done cluster 15821 
+## Done cluster 12052 
+## Done cluster 27873 
+## Done cluster 42097 
+## Cluster size 21478 broken into 11733 9745 
+## Done cluster 11733 
+## Done cluster 9745 
+## Done cluster 21478 
+## Done cluster 63575 
+## Cluster size 28396 broken into 16275 12121 
+## Cluster size 16275 broken into 8620 7655 
+## Done cluster 8620 
+## Done cluster 7655 
+## Done cluster 16275 
+## Done cluster 12121 
+## Done cluster 28396 
+## Done cluster 91971 
+## Done cluster 154713 
+## Cluster size 164520 broken into 101365 63155 
+## Cluster size 101365 broken into 38474 62891 
+## Cluster size 38474 broken into 17605 20869 
+## Cluster size 17605 broken into 8674 8931 
+## Done cluster 8674 
+## Done cluster 8931 
+## Done cluster 17605 
+## Cluster size 20869 broken into 4 20865 
+## Done cluster 4 
+## Cluster size 20865 broken into 3144 17721 
+## Done cluster 3144 
+## Cluster size 17721 broken into 17720 1 
+## Cluster size 17720 broken into 8080 9640 
+## Done cluster 8080 
+## Done cluster 9640 
+## Done cluster 17720 
+## Done cluster 1 
+## Done cluster 17721 
+## Done cluster 20865 
+## Done cluster 20869 
+## Done cluster 38474 
+## Cluster size 62891 broken into 29052 33839 
+## Cluster size 29052 broken into 5784 23268 
+## Done cluster 5784 
+## Cluster size 23268 broken into 10541 12727 
+## Done cluster 10541 
+## Done cluster 12727 
+## Done cluster 23268 
+## Done cluster 29052 
+## Cluster size 33839 broken into 31397 2442 
+## Cluster size 31397 broken into 15982 15415 
+## Cluster size 15982 broken into 4240 11742 
+## Done cluster 4240 
+## Done cluster 11742 
+## Done cluster 15982 
+## Cluster size 15415 broken into 6155 9260 
+## Done cluster 6155 
+## Done cluster 9260 
+## Done cluster 15415 
+## Done cluster 31397 
+## Done cluster 2442 
+## Done cluster 33839 
+## Done cluster 62891 
+## Done cluster 101365 
+## Cluster size 63155 broken into 30835 32320 
+## Cluster size 30835 broken into 15213 15622 
+## Cluster size 15213 broken into 8765 6448 
+## Done cluster 8765 
+## Done cluster 6448 
+## Done cluster 15213 
+## Cluster size 15622 broken into 4214 11408 
+## Done cluster 4214 
+## Done cluster 11408 
+## Done cluster 15622 
+## Done cluster 30835 
+## Cluster size 32320 broken into 15344 16976 
+## Cluster size 15344 broken into 8551 6793 
+## Done cluster 8551 
+## Done cluster 6793 
+## Done cluster 15344 
+## Cluster size 16976 broken into 12369 4607 
+## Done cluster 12369 
+## Done cluster 4607 
+## Done cluster 16976 
+## Done cluster 32320 
+## Done cluster 63155 
+## Done cluster 164520
 ```
 
 ```r
@@ -239,7 +248,7 @@ dim(betas_SA);dim(pDat_SA) # 7 samples
 ```
 
 ```
-## [1] 319625      7
+## [1] 319233      7
 ```
 
 ```
@@ -284,7 +293,7 @@ Now I wrap the above code into a function:
 ```r
 pl_infer_ethnicity <- function(betas, threshold = 0.75){ # betas need to be in the form of samples in columns
   if(!all(features %in% rownames(betas))) {
-    stop('Rownames of betas df must include all 319625 features used to fit classifier.')
+    stop('Rownames of betas df must include all 319233 features used to fit classifier.')
   }
   
   betas <- t(betas[features,])
@@ -318,17 +327,17 @@ pl_infer_ethnicity(betas_SA, threshold = 0.75)
 ## GSM1947112 GSM1947112                    Caucasian           Caucasian
 ## GSM1947297 GSM1947297                      African             African
 ##            Prob_African Prob_Asian Prob_Caucasian Highest_Prob
-## PM263        0.01433442 0.09107262      0.8945930    0.8945930
-## PM272        0.03455324 0.23050156      0.7349452    0.7349452
-## PM29         0.01881591 0.26736345      0.7138206    0.7138206
-## COX_6987     0.01740569 0.09146101      0.8911333    0.8911333
-## COX_7646     0.03549401 0.66372451      0.3007815    0.6637245
-## GSM1947112   0.02761343 0.01941917      0.9529674    0.9529674
-## GSM1947297   0.82631224 0.01353996      0.1601478    0.8263122
+## PM263        0.01436988 0.09059824      0.8950319    0.8950319
+## PM272        0.03454664 0.23113628      0.7343171    0.7343171
+## PM29         0.01877385 0.26729344      0.7139327    0.7139327
+## COX_6987     0.01733507 0.09126810      0.8913968    0.8913968
+## COX_7646     0.03545782 0.66395634      0.3005858    0.6639563
+## GSM1947112   0.02755214 0.01946175      0.9529861    0.9529861
+## GSM1947297   0.82591034 0.01353310      0.1605566    0.8259103
 ```
 
 Unfortunately the above code requires that new samples have all the features used for training 
-(n=319625), when only 1862 are required for the final prediction. Below I extract the coefficients
+(n=319233), when only 1860 are required for the final prediction. Below I extract the coefficients
 from the final model and see if I can create the same predictions using a cross product with the 
 sample vector.
 
@@ -364,8 +373,8 @@ ca/sum(af,as,ca)
 After taking out the coefficients and trying the cross product, I get values that I can't make sense
 of. I think I need to implement a loglink function on this output, but I'm not sure how to do this.
 
-Instead, I create a workaround, where given a new samples with the final 1862 features, I add on
-'fake' data of the remaining 319625-1862 features so that the predict() function accepts it.
+Instead, I create a workaround, where given a new samples with the final 1860 features, I add on
+'fake' data of the remaining 319233-1860 features so that the predict() function accepts it.
 
 # Function: Attempt 3
 
@@ -374,11 +383,11 @@ Instead, I create a workaround, where given a new samples with the final 1862 fe
 # create 'new' data of only the necessary features
 pl_features <- predictors(GLM_cv)
 newDat <- betas_SA[pl_features,]
-dim(newDat) #1862 features, 7 samples
+dim(newDat) #1860 features, 7 samples
 ```
 
 ```
-## [1] 1862    7
+## [1] 1860    7
 ```
 
 ```r
@@ -386,7 +395,7 @@ pl_infer_ethnicity <- function(betas, threshold = 0.75) {
   
   # find all final predictors in new data
   present_features <- intersect(rownames(betas), pl_features)
-  print(paste(length(present_features), 'of 1862 predictors present.'))
+  print(paste(length(present_features), 'of 1860 predictors present.'))
   
   dat <- betas[present_features,]
   dim(dat)
@@ -422,7 +431,7 @@ pl_infer_ethnicity(newDat)
 ```
 
 ```
-## [1] "1862 of 1862 predictors present."
+## [1] "1860 of 1860 predictors present."
 ```
 
 ```
@@ -435,13 +444,13 @@ pl_infer_ethnicity(newDat)
 ## GSM1947112 GSM1947112                    Caucasian           Caucasian
 ## GSM1947297 GSM1947297                      African             African
 ##            Prob_African Prob_Asian Prob_Caucasian Highest_Prob
-## PM263        0.01433442 0.09107262      0.8945930    0.8945930
-## PM272        0.03455324 0.23050156      0.7349452    0.7349452
-## PM29         0.01881591 0.26736345      0.7138206    0.7138206
-## COX_6987     0.01740569 0.09146101      0.8911333    0.8911333
-## COX_7646     0.03549401 0.66372451      0.3007815    0.6637245
-## GSM1947112   0.02761343 0.01941917      0.9529674    0.9529674
-## GSM1947297   0.82631224 0.01353996      0.1601478    0.8263122
+## PM263        0.01436988 0.09059824      0.8950319    0.8950319
+## PM272        0.03454664 0.23113628      0.7343171    0.7343171
+## PM29         0.01877385 0.26729344      0.7139327    0.7139327
+## COX_6987     0.01733507 0.09126810      0.8913968    0.8913968
+## COX_7646     0.03545782 0.66395634      0.3005858    0.6639563
+## GSM1947112   0.02755214 0.01946175      0.9529861    0.9529861
+## GSM1947297   0.82591034 0.01353310      0.1605566    0.8259103
 ```
 
 ```r
@@ -458,16 +467,121 @@ pred_prob
 ## GSM1947112 GSM1947112                    Caucasian           Caucasian
 ## GSM1947297 GSM1947297                      African             African
 ##            Prob_African Prob_Asian Prob_Caucasian Highest_Prob
-## PM263        0.01433442 0.09107262      0.8945930    0.8945930
-## PM272        0.03455324 0.23050156      0.7349452    0.7349452
-## PM29         0.01881591 0.26736345      0.7138206    0.7138206
-## COX_6987     0.01740569 0.09146101      0.8911333    0.8911333
-## COX_7646     0.03549401 0.66372451      0.3007815    0.6637245
-## GSM1947112   0.02761343 0.01941917      0.9529674    0.9529674
-## GSM1947297   0.82631224 0.01353996      0.1601478    0.8263122
+## PM263        0.01436988 0.09059824      0.8950319    0.8950319
+## PM272        0.03454664 0.23113628      0.7343171    0.7343171
+## PM29         0.01877385 0.26729344      0.7139327    0.7139327
+## COX_6987     0.01733507 0.09126810      0.8913968    0.8913968
+## COX_7646     0.03545782 0.66395634      0.3005858    0.6639563
+## GSM1947112   0.02755214 0.01946175      0.9529861    0.9529861
+## GSM1947297   0.82591034 0.01353310      0.1605566    0.8259103
 ```
 
 yay
+
+# Function: Attempt 4
+
+Because the above workaround requires publishing a 1.1 Gb model fit object, I try again to find a 
+formula for the manual cross-product method.
+
+
+```r
+#args
+object <-glm_fit
+s <- glm_fit$lambdaOpt
+type <- "response"
+exact <- F
+newx <- t(newDat)
+
+a0 <- object$a0 # dunno what this is
+rownames(a0) <- rep("(Intercept)", nrow(a0))
+nbeta <- object$beta
+klam <- dim(a0) # number of lambdas tuned against
+nclass <- klam[[1]] # # of classes
+nlambda <- length(s) # # of supplied lambda
+
+# if !is.null(s)
+lambda <- object$lambda
+lamlist <- lambda.interp(lambda, s)
+for (i in seq(nclass)) {
+  kbeta <- methods::rbind2(a0[i, , drop = FALSE], nbeta[[i]])#was rbind2
+  vnames <- dimnames(kbeta)[[1]]
+  dimnames(kbeta) <- list(NULL, NULL)
+  kbeta <- kbeta[, lamlist$left, drop = FALSE] %*% Diagonal(x=lamlist$frac) +
+    kbeta[, lamlist$right, drop = FALSE] %*% Diagonal(x=1 - lamlist$frac)
+  dimnames(kbeta) <- list(vnames, paste(seq(along = s)))
+  nbeta[[i]] <- kbeta
+}
+
+c <- lapply(nbeta, function(x) nonzeroCoef(x[-1, ,drop = FALSE], bystep = TRUE))
+
+dd <- dim(newx)
+if (inherits(newx, "sparseMatrix"))
+  newx <- as(newx, "dgCMatrix")
+npred <- dd[[1]]
+dn <- list(names(nbeta), dimnames(nbeta[[1]])[[2]], dimnames(newx)[[1]])
+dp <- array(0, c(nclass, nlambda, npred), dimnames = dn)
+for (i in seq(nclass)) {
+  fitk <- cbind2(1, newx) %*% matrix(nbeta[[i]][c("(Intercept)", colnames(newx)),])
+  dp[i, , ] = dp[i, , ] + t(as.matrix(fitk))
+}
+
+  switch(type, response = {
+    pp <- exp(dp)
+    psum <- apply(pp, c(2, 3), sum)
+    aperm(pp/rep(psum, rep(nclass, nlambda * npred)), c(3, 
+        1, 2))
+  }, link <- aperm(dp, c(3, 1, 2)), class = {
+    dpp <- aperm(dp, c(3, 1, 2))
+    apply(dpp, 3, glmnet_softmax)
+  })
+```
+
+```
+## , , 1
+## 
+##               African      Asian Caucasian
+## PM263      0.01436988 0.09059824 0.8950319
+## PM272      0.03454664 0.23113628 0.7343171
+## PM29       0.01877385 0.26729344 0.7139327
+## COX_6987   0.01733507 0.09126810 0.8913968
+## COX_7646   0.03545782 0.66395634 0.3005858
+## GSM1947112 0.02755214 0.01946175 0.9529861
+## GSM1947297 0.82591034 0.01353310 0.1605566
+```
+
+```r
+predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'class')
+```
+
+```
+##      1          
+## [1,] "Caucasian"
+## [2,] "Caucasian"
+## [3,] "Caucasian"
+## [4,] "Caucasian"
+## [5,] "Asian"    
+## [6,] "Caucasian"
+## [7,] "African"
+```
+
+```r
+predict(glm_fit, t(betas_SA), s = glm_fit$lambdaOpt, type = 'response')
+```
+
+```
+## , , 1
+## 
+##               African      Asian Caucasian
+## PM263      0.01436988 0.09059824 0.8950319
+## PM272      0.03454664 0.23113628 0.7343171
+## PM29       0.01877385 0.26729344 0.7139327
+## COX_6987   0.01733507 0.09126810 0.8913968
+## COX_7646   0.03545782 0.66395634 0.3005858
+## GSM1947112 0.02755214 0.01946175 0.9529861
+## GSM1947297 0.82591034 0.01353310 0.1605566
+```
+
+This works too!
 
 # Save data
 
@@ -525,11 +639,11 @@ ggplot(pDat_save, aes(x = Prob_Caucasian, y = Prob_African, col = Predicted_ethn
   geom_point()
 ```
 
-![](05_Deploy_classifier_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+![](05_Deploy_classifier_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
 
 ```r
 ggplot(pDat_save, aes(x = Prob_Caucasian, y = Prob_African, col = Self_reported_ethnicity)) +
   geom_point()
 ```
 
-![](05_Deploy_classifier_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
+![](05_Deploy_classifier_files/figure-html/unnamed-chunk-7-2.png)<!-- -->

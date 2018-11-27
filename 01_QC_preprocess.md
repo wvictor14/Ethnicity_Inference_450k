@@ -594,7 +594,7 @@ system.time(det_RCM <- detectionP(rgset_RCM))
 
 ```
 ##    user  system elapsed 
-##  613.78   27.62  642.31
+##  289.35   16.00  305.45
 ```
 
 ```r
@@ -926,7 +926,6 @@ Looks like no samples have >5% failed probes.
 ndetect p probes
 
 Horvath only keeps probes with < 10 missing values (note)
-
 
 
 ```r
@@ -2199,7 +2198,7 @@ system.time(thresholds3 <- thresholds3 %>% mutate(
 
 ```
 ##    user  system elapsed 
-##    0.06    0.00    0.06
+##    0.06    0.00    0.07
 ```
 
 ```r
@@ -2270,7 +2269,7 @@ dim(det)#  485512 518
 ```r
 # replace bad detection p and low bead count features with NA
 fp[fp > 0.01] <- NA 
-sum(is.na(fp)) #300551 300594
+sum(is.na(fp)) # 300594
 ```
 
 ```
@@ -2335,7 +2334,7 @@ system.time(thresholds4 <- thresholds4 %>% mutate(
 
 ```
 ##    user  system elapsed 
-##    0.07    0.00    0.06
+##    0.06    0.00    0.06
 ```
 
 ```r
@@ -2590,7 +2589,7 @@ mprice <- as_tibble(getGEO('GPL16304')@dataTable@table)
 ```
 
 ```
-## C:\Users\vyuan\AppData\Local\Temp\3\RtmpM9l52G/GPL16304.soft
+## C:\Users\vyuan\AppData\Local\Temp\3\RtmpGM1mxU/GPL16304.soft
 ```
 
 ```
@@ -2645,11 +2644,11 @@ GET((paste(base, end, sep = '')), write_disk(tf <- tempfile(fileext = ".xlsx")))
 
 ```
 ## Response [http://www.sickkids.ca/MS-Office-Files/Research/Weksberg%20Lab/48639-non-specific-probes-Illumina450k.xlsx]
-##   Date: 2018-10-30 17:13
+##   Date: 2018-11-17 22:12
 ##   Status: 200
 ##   Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 ##   Size: 1.02 MB
-## <ON DISK>  C:\Users\vyuan\AppData\Local\Temp\3\RtmpM9l52G\file36f028331e99.xlsx
+## <ON DISK>  C:\Users\vyuan\AppData\Local\Temp\3\RtmpGM1mxU\file57b8141d2aaf.xlsx
 ```
 
 ```r
@@ -2870,7 +2869,7 @@ system.time(
 
 ```
 ##    user  system elapsed 
-## 2653.13   13.09 2668.28
+## 2690.99   16.91 2709.60
 ```
 
 ```r
@@ -2920,9 +2919,32 @@ dim(BMIQ) # 343438 510
 
 Keep probes overlapping 450k/850k arrays
 
+* previously I was usin epic B2 manifest
+* now I use latest epic manifest, B4, rmeoving (319625 - 319223) more probes
+
 
 ```r
-# First I obtain the 450k/850k probenames from Minfi datasets
+# load EPIC b4 manifest file
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+```
+
+```
+## 
+## Attaching package: 'IlluminaHumanMethylationEPICanno.ilm10b4.hg19'
+```
+
+```
+## The following objects are masked from 'package:IlluminaHumanMethylation450kanno.ilmn12.hg19':
+## 
+##     Islands.UCSC, Locations, Manifest, Other,
+##     SNPs.132CommonSingle, SNPs.135CommonSingle,
+##     SNPs.137CommonSingle, SNPs.138CommonSingle,
+##     SNPs.141CommonSingle, SNPs.142CommonSingle,
+##     SNPs.144CommonSingle, SNPs.146CommonSingle,
+##     SNPs.147CommonSingle, SNPs.Illumina
+```
+
+```r
 library(minfiData)
 library(minfiDataEPIC)
 ```
@@ -2941,6 +2963,17 @@ library(minfiDataEPIC)
 ```
 
 ```
+## The following objects are masked from 'package:IlluminaHumanMethylationEPICanno.ilm10b4.hg19':
+## 
+##     Islands.UCSC, Locations, Manifest, Other,
+##     SNPs.132CommonSingle, SNPs.135CommonSingle,
+##     SNPs.137CommonSingle, SNPs.138CommonSingle,
+##     SNPs.141CommonSingle, SNPs.142CommonSingle,
+##     SNPs.144CommonSingle, SNPs.146CommonSingle,
+##     SNPs.147CommonSingle, SNPs.Illumina
+```
+
+```
 ## The following objects are masked from 'package:IlluminaHumanMethylation450kanno.ilmn12.hg19':
 ## 
 ##     Islands.UCSC, Locations, Manifest, Other,
@@ -2952,23 +2985,66 @@ library(minfiDataEPIC)
 ```
 
 ```r
+annoEPIC <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+dim(annoEPIC) # 865859
+```
+
+```
+## [1] 865859     46
+```
+
+```r
+dim(ann450k) # 485512 
+```
+
+```
+## [1] 485512     33
+```
+
+```r
+cpg_ol <- intersect(annoEPIC$Name, ann450k$Name)
+length(cpg_ol) # 452453 overlapping probes
+```
+
+```
+## [1] 452453
+```
+
+```r
 data(RGsetEx)
-cpg_450k <- rownames(getBeta(RGsetEx))
+data("RGsetEPIC")
+
+# snp probes
 snp_450k <- rownames(getSnpBeta(RGsetEx))
-
-data(RGsetEPIC)
-cpg_EPIC <- rownames(getBeta(RGsetEPIC))
 snp_EPIC <- rownames(getSnpBeta(RGsetEPIC))
+length(snp_450k);length(snp_EPIC) #65 59
+```
 
-overlap_450k_EPIC <- intersect(c(cpg_450k, snp_450k), c(cpg_EPIC, snp_EPIC))
+```
+## [1] 65
+```
 
+```
+## [1] 59
+```
+
+```r
+snp_ol <- intersect(snp_450k, snp_EPIC)
+length(snp_ol) # 59
+```
+
+```
+## [1] 59
+```
+
+```r
 # remove non-overlapping probes from combined data
-BMIQ_epic <- BMIQ[intersect(rownames(BMIQ), overlap_450k_EPIC),]
-dim(BMIQ_epic) # 319625 510
+BMIQ_epic <- BMIQ[intersect(rownames(BMIQ), c(cpg_ol, snp_ol)),]
+dim(BMIQ_epic) # 319233 510
 ```
 
 ```
-## [1] 319625    510
+## [1] 319233    510
 ```
 
 # 6.0 Save processed data

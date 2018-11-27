@@ -1,0 +1,27 @@
+---
+output: github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# Ethnicity_Inference_450k
+
+This repository contains all code used to develop the DNAm-based ethnicity classifier on placental 
+data [1].
+
+See my other repository, [plmec](https://github.com/wvictor14/plmec), to download the placental 
+DNAm-based ethnicity classifier.
+
+## References
+
+[1] Yuan V, Price M, Del Gobbo G, Cox B, Binder AM, Michels KB, Marsit C, Robinson W: Inferring
+population structure from placental DNA methylation studies. *In prep.*

@@ -411,7 +411,6 @@ ndetect p probes
 
 Horvath only keeps probes with < 10 missing values (note)
 
-
 ```{r list of probes 5 missing values, eval = T}
 probes_morethan5NAs <- as.data.frame(names(which((rowSums(det > 0.01, na.rm = T)>5))))
 ```
@@ -489,10 +488,9 @@ dim(fp) # 485512  518
 dim(bc) # 485512 491
 dim(det)#  485512 518
 
-
 # replace bad detection p and low bead count features with NA
 fp[fp > 0.01] <- NA 
-sum(is.na(fp)) #300551 300594
+sum(is.na(fp)) # 300594
 
 # subset out Fry info
 fp_temp <- fp[,colnames(bc)]
@@ -776,24 +774,33 @@ dim(BMIQ) # 343438 510
 
 Keep probes overlapping 450k/850k arrays
 
+* previously I was usin epic B2 manifest
+* now I use latest epic manifest, B4, rmeoving (319625 - 319223) more probes
+
 ```{r}
-# First I obtain the 450k/850k probenames from Minfi datasets
+# load EPIC b4 manifest file
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 library(minfiData)
 library(minfiDataEPIC)
+annoEPIC <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+dim(annoEPIC) # 865859
+dim(ann450k) # 485512 
+cpg_ol <- intersect(annoEPIC$Name, ann450k$Name)
+length(cpg_ol) # 452453 overlapping probes
 
 data(RGsetEx)
-cpg_450k <- rownames(getBeta(RGsetEx))
+data("RGsetEPIC")
+
+# snp probes
 snp_450k <- rownames(getSnpBeta(RGsetEx))
-
-data(RGsetEPIC)
-cpg_EPIC <- rownames(getBeta(RGsetEPIC))
 snp_EPIC <- rownames(getSnpBeta(RGsetEPIC))
-
-overlap_450k_EPIC <- intersect(c(cpg_450k, snp_450k), c(cpg_EPIC, snp_EPIC))
+length(snp_450k);length(snp_EPIC) #65 59
+snp_ol <- intersect(snp_450k, snp_EPIC)
+length(snp_ol) # 59
 
 # remove non-overlapping probes from combined data
-BMIQ_epic <- BMIQ[intersect(rownames(BMIQ), overlap_450k_EPIC),]
-dim(BMIQ_epic) # 319625 510
+BMIQ_epic <- BMIQ[intersect(rownames(BMIQ), c(cpg_ol, snp_ol)),]
+dim(BMIQ_epic) # 319233 510
 ```
 
 # 6.0 Save processed data
