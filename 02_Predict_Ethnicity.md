@@ -41,6 +41,7 @@ library(impute)
 library(ggridges)
 library(sesame)
 library(readxl)
+library(irlba)
 source('../sscen.R')
 ```
 
@@ -489,6 +490,37 @@ dim(pDat);dim(betas);dim(betas_all) # [1] 499  23 [1]    499 319233 [1]    499 4
 ```
 ## [1]    499 485577
 ```
+
+## 1.2 Dataset-specific effects
+
+
+```r
+pca <- prcomp_irlba(betas, n=10)
+
+pcs_cor_mar <- lmmatrix(dep = pca$x, 
+                        ind = pDat %>% 
+                          select(Dataset)) %>% t()
+pca$sdev / sum(pca$sdev)
+```
+
+```
+##  [1] 0.18593376 0.13717072 0.12722178 0.11629683 0.10812731 0.08118618
+##  [7] 0.07274593 0.05917162 0.05740971 0.05473616
+```
+
+```r
+ggplot(cbind(pDat,pca$x) %>% mutate(Cohort_label = case_when(
+  Dataset == 'Michels' ~ 'C1',
+  Dataset == 'Fry' ~ 'C2',
+  Dataset == 'Marsit' ~ 'C3',
+  Dataset == 'Cox' ~ 'C4', 
+  Dataset == 'Robinson' ~ 'C5'
+)), aes(x = PC1, y = PC2, col = Cohort_label)) +
+  geom_point() + theme_bw() +
+  labs( x = 'PC1 (18.59%)', y = 'PC2 (13.72%)')
+```
+
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
 
 # 2.0 Inner CV
 
@@ -1119,7 +1151,7 @@ ggplot(class_acc,
   theme_bw() + scale_fill_manual(values =  cbPalette)
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
 
 ```r
 g2 <- ggplot(class_acc, aes(x = Algorithm, y = Accuracy)) +
@@ -1130,7 +1162,17 @@ g2 <- ggplot(class_acc, aes(x = Algorithm, y = Accuracy)) +
 g2  
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-7-2.png)<!-- -->
+
+```r
+ggplot(class_acc, aes(x = Algorithm, y = Accuracy)) +
+  geom_boxplot() +
+  theme_bw() +
+  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(x = '') + facet_wrap(~Ethnicity)
+```
+
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-7-3.png)<!-- -->
 
 ```r
 #ggbarplot(class_acc, x= 'Algorithm', y = 'Accuracy', color = 'Algorithm', 
@@ -1203,6 +1245,19 @@ class_acc %>% arrange(Algorithm, Ethnicity, fold)
 ## 58       SVM fold3 0.946212121 Caucasian
 ## 59       SVM fold4 0.981002639 Caucasian
 ## 60       SVM fold5 0.979300292 Caucasian
+```
+
+```r
+class_acc %>% group_by(Ethnicity) %>% summarize(Acc = mean(Accuracy)) 
+```
+
+```
+## # A tibble: 3 x 2
+##   Ethnicity   Acc
+##   <chr>     <dbl>
+## 1 African   0.679
+## 2 Asian     0.448
+## 3 Caucasian 0.980
 ```
 ggsave(g2, filename = '../../Results/11_Class_specific_resampling_performance.tiff')
 
@@ -1430,7 +1485,7 @@ p <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y =
 ## Warning: Removed 56 rows containing missing values (geom_point).
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
 
 ```r
 p2 <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y = value, col = Class)) +
@@ -1448,7 +1503,7 @@ p2 <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y 
 ## Warning: Removed 56 rows containing missing values (geom_point).
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-8-2.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-9-2.png)<!-- -->
 
 ```r
 thresholds_plot %>% filter(thresholds < 0.625 & thresholds > 0.58)
@@ -1537,7 +1592,7 @@ ggplot(cm_df_thresh) +
   coord_equal()
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
 
 saveRDS(pDat %>% select(-PredictedSex), '../../Robjects_final/02_pDat.rds')
 pDat <- readRDS('../../Robjects_final/02_pDat.rds')
@@ -1625,7 +1680,7 @@ ggplot(cm_by_dataset) +
   facet_grid(~Cohort)
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
 
 write.table(perf_by_dataset, '../../Performance_by_dataset.txt', quote = F, row.names= F)
 write.table(cm_by_dataset, '../../Performance_by_dataset.txt', quote = F, row.names= F)
@@ -1674,7 +1729,7 @@ ggboxplot(pDat, x = 'Prediction_result', y = 'Prob_High_con',
   theme(legend.position = 'none')
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
 
 ```r
 ggboxplot(pDat, x = 'Prediction_result', y = 'Prob_correct_con',
@@ -1684,7 +1739,7 @@ ggboxplot(pDat, x = 'Prediction_result', y = 'Prob_correct_con',
   theme(legend.position = 'none')
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-2.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-12-2.png)<!-- -->
 
 ```r
 ggplot(pDat, aes(x = Prediction_result, y = Prob_correct_con)) +
@@ -1692,7 +1747,7 @@ ggplot(pDat, aes(x = Prediction_result, y = Prob_correct_con)) +
   labs(y = 'Probability associated with\ncorrect class', x = 'Classification Result')
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-3.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-12-3.png)<!-- -->
 
 ```r
 # statistically signficant?
@@ -1737,7 +1792,7 @@ ggplot(df, aes(x=Coordinate1,y=Coordinate2)) +
   theme_bw(base_size = 12);
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-11-4.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-12-4.png)<!-- -->
 
 # 4.0 Final training
 
@@ -1812,7 +1867,7 @@ GLM_cv <- readRDS('../../Robjects_final/02_GLM_cv_logloss.rds')
 
 
 ```r
-# Calculate the 'importance' for each predictor. This is related to the centroid distance for each
+# Calculate the 'importance' for each predictor. This is related to their coefficients
 # class
 glm_features <- varImp(GLM_cv)
 glm <- glm_features$importance
@@ -1845,7 +1900,7 @@ plot1 <- ggplot(plot_data, aes(x = value, y = variable)) +
 ## Picking joint bandwidth of 0.00307
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
 
 ```r
 # Figure out how many sites fall into each category
@@ -1889,7 +1944,7 @@ anno <- anno %>% as_tibble() %>%
 # filter out to only those in glm predictor (explicit rs probes excluded)
 anno_glm <- anno %>% filter(CpG %in% glm$features)
 
-# Catherine Do et al 2018 placental mQTLs
+# F delahaye et al 2018 placental mQTLs
 cdo <- read_xlsx('../../data/C Do et al 2018/journal.pgen.1007785.s018.xlsx')
 ```
 
@@ -1962,7 +2017,7 @@ upset(as.data.frame(glm_upset), sets = c('Ethnicity_predictive_cpgs',
       keep.order = T, text.scale = 2)
 ```
 
-![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-15-2.png)<!-- -->
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-16-2.png)<!-- -->
 
 ```r
 # number of probes with snp in probe / cpg / sbe position
@@ -2140,6 +2195,222 @@ fisher.test(matrix(c(802, 64821, 1043, 254353), nrow = 2, ncol=2), alternative="
 
 write.table(anno_glm_all, '../../Robjects_final/02_glm_features.txt', sep = '\t', quote = F,
             row.names = F) 
+
+## 4.2 Location
+
+
+```r
+anno_glm %>% pull(chr) %>% table
+```
+
+```
+## .
+##  chr1 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19  chr2 
+##   171    75   101    83    57    53    74    95   131    18    91   167 
+## chr20 chr21 chr22  chr3  chr4  chr5  chr6  chr7  chr8  chr9  chrX 
+##    29    16    32    91    61    87   150   106    94    36    27
+```
+
+```r
+anno_train <- anno %>% filter(CpG %in% rownames(GLM_cv$finalModel$beta$African))
+
+# pull out # of features localized to chromosome for training and ethnicity-predictive sites
+# calculate proportions
+location_chr <- anno_train %>% pull(chr) %>% table() %>% as_tibble() %>%
+  mutate(prop = n/sum(n)) %>% mutate(set = 'Training data') 
+location_chr <- location_chr %>% bind_rows(
+  anno_glm %>% pull(chr) %>% table() %>% as_tibble() %>% 
+  mutate(prop=n/sum(n), set = 'Ethnicity-predictive features'))
+colnames(location_chr)[1] <- 'Chromosome'
+location_chr <- location_chr %>% 
+  mutate(Chromosome = factor(gsub('chr', '', Chromosome), levels = c(1:22, 'X', 'Y'))) 
+
+###### use fisher's test if ethnicity features are enriched by chromosomes ####
+#### create contingency tables
+# contingency table for ethnicity features, by chromosome, yes no
+location_chr_table <- location_chr %>% 
+  filter(set == 'Ethnicity-predictive features') %>% select(-prop, -set) %>%
+  rename(Chr_eth_yes = n) %>% mutate(Chr_eth_no = sum(Chr_eth_yes)-Chr_eth_yes) 
+
+# non-ethnicity training features annotation
+anno_noneth <- anno_train %>% filter(!CpG %in% anno_glm$CpG)
+location_chr_noneth <- anno_noneth %>% pull(chr) %>% table() %>% as_tibble()
+colnames(location_chr_noneth)[1] <- 'Chromosome'
+
+# contingency table for non-ethnicity training features
+location_chr_table2 <- location_chr_noneth %>% 
+  rename(Chr_noneth_yes = n) %>% mutate(Chr_noneth_no = sum(Chr_noneth_yes)-Chr_noneth_yes) %>% 
+  mutate(Chromosome = factor(gsub('chr', '', Chromosome), levels = c(1:22, 'X', 'Y'))) 
+
+# add contingency tables together
+location_chr_table <- left_join(location_chr_table, location_chr_table2)
+```
+
+```
+## Joining, by = "Chromosome"
+```
+
+```r
+location_chr_table <- location_chr_table %>% 
+  select(Chromosome, Chr_eth_yes, Chr_noneth_yes, Chr_eth_no,  Chr_noneth_no)
+
+# run fisher tests
+location_chr_table <- location_chr_table %>% 
+  mutate(pvalue = 
+           apply(location_chr_table[,2:5], MARGIN = 1,
+                 function(x) fisher.test(matrix(unlist(x),2,2),
+                                         alternative = 'greater')$p.value))
+
+#########
+# add p values to proportion data frame
+
+# add a data frame indicating which chromosomes show an enrichment
+# first calculate positions
+label_pos <- location_chr %>% group_by(Chromosome) %>% filter(prop == max(prop)) %>%
+  arrange(Chromosome) %>% select(Chromosome, prop) %>%
+  # calculate position
+  mutate(prop = prop + 0.005) %>%
+  # add pvalue
+  left_join(location_chr_table %>% select(Chromosome, pvalue)) %>%
+  # pvalue thresholds
+  mutate(p05 = ifelse(pvalue < 0.05, T, F),
+         p01 = ifelse(pvalue < 0.01, T, F),
+         p001 = ifelse(pvalue < 0.001, T, F))
+```
+
+```
+## Joining, by = "Chromosome"
+```
+
+```r
+ggplot(location_chr, aes(x = Chromosome, y = prop*100)) +
+  geom_bar(stat = 'identity', width = 0.6, position = position_dodge(width = 0.6),
+           col = 'black', aes(fill = set)) +
+  labs(y = 'Proportion (%)', fill = '') + theme_bw() + 
+  scale_y_continuous(expand=c(0,0), limits = c(0,10)) +
+  scale_fill_manual(values = c('#8c510a', '#c7eae5')) + 
+  geom_text(data = label_pos %>% filter(p05 == T, p01 == F, p001 == F), label = "*") + 
+  geom_text(data = label_pos %>% filter(p05 == T, p01 == T, p001 == F), label = "**") + 
+  geom_text(data = label_pos %>% filter(p05 == T, p01 == T, p001 == T), label = "***") +
+  theme(legend.position = 'top')
+```
+
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
+
+## 4.3 CpG Islands
+
+
+```r
+# pull out # of features localized to chromosome for training and ethnicity-predictive sites
+# calculate proportions
+l_islands<- anno_train %>% pull(Relation_to_Island) %>% table() %>% as_tibble() %>%
+  mutate(prop = n/sum(n)) %>% mutate(set = 'Training data') 
+l_islands <- l_islands %>% bind_rows(
+  anno_glm %>% pull(Relation_to_Island) %>% table() %>% as_tibble() %>% 
+  mutate(prop=n/sum(n), set = 'Ethnicity-predictive features'))
+colnames(l_islands)[1] <- 'Relation_to_Island'
+
+#### create contingency tables
+l_islands_table <- anno_glm %>% pull(Relation_to_Island) %>% table() %>% as_tibble() %>%
+  rename(islandyes_ethyes = n) %>%
+  mutate(islandno_ethyes = sum(islandyes_ethyes) - islandyes_ethyes)
+l_islands_table2 <- anno_noneth %>% pull(Relation_to_Island) %>% table() %>% as_tibble()%>%
+  rename(islandyes_ethno = n) %>%
+  mutate(islandno_ethno = sum(islandyes_ethno) - islandyes_ethno)
+
+
+# add contingency tables together
+l_islands_table <- left_join(l_islands_table, l_islands_table2) 
+```
+
+```
+## Joining, by = "."
+```
+
+```r
+colnames(l_islands_table)[1] <- 'Relation_to_Island'
+
+# run fisher tests
+l_islands_table <- l_islands_table %>% 
+  mutate(pvalue = 
+           apply(l_islands_table[,2:5], MARGIN = 1,
+                 function(x) fisher.test(matrix(unlist(x),2,2),
+                                         alternative = 'greater')$p.value))
+
+### plot
+
+# calculate positions of 'significance' asterisks indicators
+label_pos_islands <- l_islands %>% group_by(Relation_to_Island) %>%
+  filter(prop == max(prop)) %>% arrange(Relation_to_Island) %>% 
+  select(Relation_to_Island, prop) %>%
+  # add vertical justification of label
+  mutate(prop = prop + 0.025) %>%
+  # add pvalue column
+  left_join(l_islands_table %>% select(Relation_to_Island, pvalue)) %>%
+  # pvalue indicator columns, based on common thresholds
+  mutate(p05 = ifelse(pvalue < 0.05, T, F),
+         p01 = ifelse(pvalue < 0.01, T, F),
+         p001 = ifelse(pvalue < 0.001, T, F))
+```
+
+```
+## Joining, by = "Relation_to_Island"
+```
+
+```r
+ggplot(l_islands, aes(x = Relation_to_Island, y = prop*100)) +
+  geom_bar(stat = 'identity', width = 0.6, position = position_dodge(width = 0.6),
+           col = 'black', aes(fill = set)) +
+  labs(y = 'Proportion (%)', fill = '') + theme_bw() + 
+  scale_y_continuous(expand=c(0,0), limits = c(0,60)) +
+  scale_fill_manual(values = c('#8c510a', '#c7eae5')) + 
+  geom_text(data = label_pos_islands %>% filter(p05 == T, p01 == F, p001 == F), label = "*") + 
+  geom_text(data = label_pos_islands %>% filter(p05 == T, p01 == T, p001 == F), label = "**") + 
+  geom_text(data = label_pos_islands %>% filter(p05 == T, p01 == T, p001 == T), label = "***") +
+  theme(legend.position = 'top')
+```
+
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-18-1.png)<!-- -->
+
+## 4.4 Functional enrichment
+
+
+```r
+library(missMethyl)
+```
+
+```
+## 
+```
+
+```r
+mmethGO <- gometh(anno_glm$CpG, anno_train$CpG, plot.bias = T)
+```
+
+```
+## Warning in alias2SymbolTable(flat$symbol): Multiple symbols ignored for one
+## or more aliases
+```
+
+```r
+mmethGO <- mmethGO %>% mutate(GO = rownames(mmethGO)) %>% as_tibble() %>% arrange(FDR)
+
+mmethKEGG <- gometh(anno_glm$CpG, anno_train$CpG, plot.bias = T, collection = 'KEGG')
+```
+
+```
+## Warning in alias2SymbolTable(flat$symbol): Multiple symbols ignored for one
+## or more aliases
+```
+
+![](02_Predict_Ethnicity_files/figure-html/unnamed-chunk-19-1.png)<!-- -->
+
+```r
+mmethKEGG <- mmethKEGG %>% mutate(KEGG = rownames(mmethKEGG)) %>% as_tibble() %>% arrange(FDR)
+```
+
+write.table(anno_glm_all, '../../Results/02_classifier_features.txt', row.names = F, sep = '\t',
+            quote = F)
 
 # 5.0 compare to zhou's classifier
 

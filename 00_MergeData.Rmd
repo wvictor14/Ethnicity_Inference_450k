@@ -323,7 +323,7 @@ Here I edit the Michels pData
 
 And for ethnicity, this information was taken from the email from Dr. Binder: 
 
-'...the associated pData matrix includes gestational diabetes status (1=yes, 0=no), and an indicator for maternal ethnicity (1=white (not of Hispanic origin),  3=Hispanic or Latino,  4= Asian/Pacific Islander,  5=Black/African-American).'
+'...the associated pData matrix includes gestational diabetes status (1=yes, 0=no), and an indicator for ethnicity (1=white (not of Hispanic origin),  3=Hispanic or Latino,  4= Asian/Pacific Islander,  5=Black/African-American).'
 
 ```{r clean_pdat}
 #check pdata
