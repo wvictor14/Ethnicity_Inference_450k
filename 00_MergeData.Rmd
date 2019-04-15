@@ -634,13 +634,13 @@ Save Combined Data
 This data contains the full robinson cox and marsit datasets, without any filtering done.
 
 ```{r save rgset, eval = FALSE}
-saveRDS(rgset, '../../Robjects/rgset_RobCoxMarsit.rds')
+saveRDS(rgset, '../../Robjects_final/00_rgset_RobCoxMarsit.rds')
 ```
 
 Load Combined Data
 
 ```{r load combined data, eval = FALSE}
-rgset <- readRDS('../../Robjects/rgset_RobCoxMarsit.rds')
+rgset <- readRDS('../../Robjects_final/00_rgset_RobCoxMarsit.rds')
 ```
 
 # 4.0 Merge All data

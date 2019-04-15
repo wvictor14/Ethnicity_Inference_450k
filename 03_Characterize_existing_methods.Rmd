@@ -42,7 +42,7 @@ Load Data
 ```{r}
 # betas and pdata
 betas <- readRDS('../../Robjects_final/01_processed_betas_EPIC.rds') 
-dim(betas) #  319625    510
+dim(betas) #  319233    510
 pDat <- readRDS('../../Robjects_final/02_pDat.rds') #pData with predicted ethnicity probabilities
 dim(pDat) # 499 29
 
@@ -285,15 +285,15 @@ g1 <- ggplot(pcs_cor, aes(x = PC, y = Variable)) +
 
 
 # summarize variance explained in ethnicity
-ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'), 
+g1 <- ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75, size = 0.9) + geom_line(size = 0.25) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
   scale_color_brewer(palette = 6, type = 'qual') +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1));g1  # ggsave h = 5, w = 3
 ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'), 
        aes(x = PC, y = Rsquared)) +
   geom_boxplot(aes(col = method)) + scale_y_continuous(limits = c(0,1)) +
@@ -310,24 +310,24 @@ ggplot(pcs_cor %>% filter(Variable == 'Ethnicity'),
   scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1))
 
 ## proportion of variance explaind in genetic ancestry
-ggplot(pcs_cor %>% filter(grepl('Coordinate1', Variable)), 
+g2 <- ggplot(pcs_cor %>% filter(grepl('Coordinate1', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75, size = 0.9) + geom_line(size = 0.25) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
   scale_colour_manual(values = c('#984ea3', '#ff7f00'))+
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
-ggplot(pcs_cor %>% filter(grepl('Coordinate2', Variable)), 
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1));g2 # ggsave h = 5, w = 3
+g3 <- ggplot(pcs_cor %>% filter(grepl('Coordinate2', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
-  geom_point(aes(col = Cohort), alpha = 0.75) + geom_line(aes()) + theme_bw() +
+  geom_point(aes(col = Cohort), alpha = 0.75, size = 0.9) + geom_line(size = 0.25) + theme_bw() +
   facet_wrap(~method, ncol = 1) + 
   scale_colour_manual(values = c('#984ea3', '#ff7f00'))+
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
         axis.title.y = element_text(angle = 0, vjust = 0.5)) +
   labs(y = expression(R^2), x = '') +
-  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)) # ggsave h = 5, w = 3
+  scale_y_continuous(limits = c(0,1), breaks = c(0,0.5,1)); g3 # ggsave h = 5, w = 3
 ggplot(pcs_cor %>% filter(grepl('Coordinate3', Variable)), 
        aes(x = PC, y = Rsquared, col = Cohort, group = Cohort)) +
   geom_point(aes(col = Cohort)) + geom_line(aes()) + theme_bw() +
@@ -343,7 +343,7 @@ ggplot(pcs_cor %>% filter(grepl('Coordinate3', Variable)),
 
 Now see how many associations remain after correcting with these PCs in a linear modeling procedure.
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, eval =F}
 # apply linear modeling in each dataset adjusting for 1 pc of each method, then for the first 2 pcs 
 # of each method, first 3, first 4..... so on. and take out the number of Hits at significance 
 for (i in levels(pDat$Dataset)) {

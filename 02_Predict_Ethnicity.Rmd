@@ -136,7 +136,7 @@ ggplot(cbind(pDat,pca$x) %>% mutate(Cohort_label = case_when(
   Dataset == 'Robinson' ~ 'C5'
 )), aes(x = PC1, y = PC2, col = Cohort_label)) +
   geom_point() + theme_bw() +
-  labs( x = 'PC1 (18.59%)', y = 'PC2 (13.72%)')
+  labs( x = 'PC1 (18.59%)', y = 'PC2 (13.72%)', col = 'Cohort')
 ```
 
 # 2.0 Inner CV
@@ -802,8 +802,9 @@ p <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y =
   scale_x_continuous(breaks = seq(0,1,0.2)) +
   theme(legend.position = 'bottom') + theme_bw();p
 
-p2 <- ggplot(thresholds_plot %>% filter(thresholds != 1), aes(x = thresholds, y = value, col = Class)) +
-  geom_point() + geom_line() + #geom_vline(xintercept = 0.6, col = 'red') +
+p2 <- ggplot(thresholds_plot %>% filter(thresholds != 1), 
+             aes(x = thresholds, y = value, col = Class)) +
+  geom_point(size = 1) + geom_line(size = 0.25) + #geom_vline(xintercept = 0.6, col = 'red') +
   labs(y = '', x = 'Ambiguous classification threshold', col = '') +
   facet_wrap(~Metric, ncol = 3, scales = 'free',
              labeller = labeller(Metric = c(Accuracy = 'Accuracy', 
@@ -816,7 +817,7 @@ thresholds_plot %>% filter(thresholds < 0.625 & thresholds > 0.58)
 thresholds_plot %>% filter(thresholds < 0.005 )
 ```
 
-I decide on a threshold of 0.6, after playing around with a couple. This leads to only moderate
+I decide on a threshold of 0.75, after playing around with a couple. This leads to only moderate
 decreases in overall accuracy, with some slight increases in positive predictive value.
 
 The real benefit here is that the self-reported labels cannot be considered the ground 'truth', and
@@ -851,8 +852,11 @@ ggplot(cm_df_thresh) +
                        guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")) +
   theme_bw(base_size = 12) + 
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  scale_x_discrete(expand = c(0,0)) + 
-  scale_y_discrete(expand=c(0,0))+
+  scale_x_discrete(expand = c(0,0), 
+                   labels = c('African (48)', 'Asian (35)', 'Caucasian (384)', 
+                              'Ambiguous (32)')) + 
+  scale_y_discrete(expand=c(0,0),
+                   labels = c('African (57)', 'Asian (35)', 'Caucasian (389)'))+
   labs(fill = 'Samples in\nself-reported\nclass (%)\n', 
        x = 'Predicted Ethnicity', y = 'Self-reported\nEthnicity') +
   coord_equal()
@@ -1337,7 +1341,7 @@ ggplot(l_islands, aes(x = Relation_to_Island, y = prop*100)) +
   geom_text(data = label_pos_islands %>% filter(p05 == T, p01 == F, p001 == F), label = "*") + 
   geom_text(data = label_pos_islands %>% filter(p05 == T, p01 == T, p001 == F), label = "**") + 
   geom_text(data = label_pos_islands %>% filter(p05 == T, p01 == T, p001 == T), label = "***") +
-  theme(legend.position = 'top')
+  theme(legend.position = 'top', axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
 ## 4.4 Functional enrichment

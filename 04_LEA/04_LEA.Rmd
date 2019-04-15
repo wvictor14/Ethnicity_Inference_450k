@@ -374,8 +374,7 @@ Qmatrix <- rbind(K3Q, K4Q, K5Q) %>% as_tibble %>%
 library(tidyr)
 
 ## load gsat info
-GSAT_samp_comp <- read_xlsx('../../../Ethnicity Predictor sample info/GSAT sample comparisonTEST.xlsx',
-                            sheet = 2)
+GSAT_samp_comp <- read_xlsx('../../../Ethnicity Predictor sample info/GSAT sample comparisonTEST.xlsx', sheet = 2)
 Q_res <- Q_res[,-2] %>% as_tibble() %>%
   mutate(study_id = gsub('_.*', '', V7)) %>% 
   left_join(GSAT_samp_comp[,c(1,5,6,7,8,9,10,11)])
@@ -402,7 +401,7 @@ col_african <-'#FF6E90'
 col_caucasian <- '#539AB3'
 
 p1 <- ggplot(Q_res2, aes(x = V7, y = Ethnicity_variable)) + 
-  geom_tile(aes(fill = Ethnicity_value)) +
+  geom_tile(aes(fill = Ethnicity_value), col = 'white', size = 1.25) +
   scale_fill_manual(values = c('African' = '#F8766D', 'Ambiguous' = 'gray', 'Asian' = '#00BA38', 
                       'East_Asian' = '#00BA38', 'South_Asian' = '#4E774D', 
                       'Middle Eastern' = '#DACF55', 'Unavailable' = 'white', 
@@ -421,7 +420,8 @@ p1 <- ggplot(Q_res2, aes(x = V7, y = Ethnicity_variable)) +
         legend.key.size = unit(0.4, "cm"),
         legend.key = element_rect( color = "black"), # add box around legend icons
         legend.justification = c(0,0.5));p1       # aligns legends
-  
+
+
 # plot probabilities above the heatmap
 pDat_plot <- pDat_C6 %>% 
   select(genorep2c_ID, contains('Prob_', ignore.case=F), -contains('cat'), - contains('con')) %>% 

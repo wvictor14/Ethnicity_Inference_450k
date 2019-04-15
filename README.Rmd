@@ -14,11 +14,12 @@ knitr::opts_chunk$set(
 ```
 
 # Ethnicity_Inference_450k
+[![DOI](https://zenodo.org/badge/157613129.svg)](https://zenodo.org/badge/latestdoi/157613129)
 
-This repository contains all code used to develop the DNAm-based ethnicity classifier on placental 
-data [1].
+This repository contains all code used to develop the PlaNET, a DNAme-based ethnicity classifier for
+placental DNA methylation microarray data [1].
 
-See my other repository, [plmec](https://github.com/wvictor14/plmec), to download the placental 
+See my other repository, [wvictor14/planet](https://github.com/wvictor14/planet), to download the placental 
 DNAm-based ethnicity classifier.
 
 ## References
